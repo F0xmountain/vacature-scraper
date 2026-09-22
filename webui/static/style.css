@@ -1,0 +1,395 @@
+:root{
+  --ink:#0F1216;
+  --paper:#E9ECEF;
+  --surface:#FFFFFF;
+  --surface-2:#F5F7F8;
+  --line:#D5DAE0;
+  --line-zacht:#E6EAEE;
+  --muted:#5F6975;
+  --accent:#0B4F5C;
+  --accent-zacht:#E0EDEF;
+  --signal:#B8860B;
+  --signal-zacht:#FBF1D8;
+  --ja:#2F7A5A;
+  --ja-zacht:#E4F1EA;
+
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans",-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  --r:6px;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:14px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+  /* App-shell: body vult het venster en scrollt zelf niet. De vaste onderdelen
+     (kopbalk, vangst, werkbalk) houden hun hoogte; alleen .split krijgt de rest
+     en laat de lijst intern scrollen, zodat de detailkolom blijft staan. */
+  display:flex;flex-direction:column;height:100%;overflow:hidden;
+}
+/* Alles direct in body houdt zijn eigen hoogte; .split (hieronder) rekt mee. */
+body>*{flex:0 0 auto}
+a{color:inherit}
+button{font:inherit;color:inherit}
+
+/* ---------- kopbalk ---------- */
+.balk{
+  position:sticky;top:0;z-index:20;
+  background:var(--surface);
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:16px;
+  padding:12px 20px;
+  flex-wrap:wrap;
+}
+.merk{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.merk h1{
+  font-family:var(--cond);
+  font-weight:700;font-size:19px;letter-spacing:.01em;
+  margin:0;
+}
+.merk .sub{
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  letter-spacing:.04em;
+}
+.merk .logo{height:26px;width:auto;align-self:center}
+.knop{
+  border:1px solid var(--line);
+  background:var(--surface);
+  border-radius:var(--r);
+  padding:7px 13px;
+  font-weight:600;font-size:13px;
+  cursor:pointer;
+  transition:background .12s ease,border-color .12s ease;
+}
+.knop:hover{background:var(--surface-2);border-color:#BEC5CD}
+.knop.primair{
+  background:var(--accent);border-color:var(--accent);color:#fff;
+}
+.knop.primair:hover{background:#0D5E6D;border-color:#0D5E6D}
+.knop:disabled{opacity:.5;cursor:not-allowed}
+.knop:focus-visible,a:focus-visible,input:focus-visible,.rij:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+
+.status{
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  display:flex;align-items:center;gap:7px;
+}
+.stip{width:7px;height:7px;border-radius:50%;background:#8FA0A6}
+.stip.bezig{background:var(--signal);animation:pols 1.1s ease-in-out infinite}
+.stip.klaar{background:#2F7A5A}
+@keyframes pols{0%,100%{opacity:.25}50%{opacity:1}}
+
+/* ---------- laadbalk tijdens een run ---------- */
+.laadbalk{
+  position:absolute;left:0;right:0;bottom:0;height:3px;overflow:hidden;
+}
+.laadbalk::before{
+  content:"";position:absolute;top:0;bottom:0;width:32%;
+  background:var(--accent);border-radius:2px;
+  animation:laadloop 1.3s ease-in-out infinite alternate;
+}
+@keyframes laadloop{from{left:0}to{left:68%}}
+@media (prefers-reduced-motion:reduce){
+  .laadbalk::before{left:0;width:100%}
+}
+
+/* ---------- vangststrip: het signatuurelement ---------- */
+.vangst{
+  background:var(--surface);
+  border-bottom:1px solid var(--line);
+  padding:12px 20px 14px;
+}
+.vangst-kop{
+  display:flex;align-items:baseline;gap:12px;margin-bottom:8px;
+}
+.eyebrow{
+  font-family:var(--cond);text-transform:uppercase;
+  letter-spacing:.09em;font-size:11px;font-weight:700;color:var(--muted);
+}
+.vangst-totaal{font-family:var(--mono);font-size:12px;color:var(--ink)}
+.vangst-totaal b{font-weight:600}
+.vangst-reset{
+  margin-left:auto;border:0;background:none;cursor:pointer;
+  font-family:var(--mono);font-size:11px;color:var(--accent);
+  text-decoration:underline;text-underline-offset:3px;padding:0;
+}
+.balken{display:flex;height:26px;gap:2px;border-radius:3px;overflow:hidden}
+.segment{
+  border:0;padding:0;cursor:pointer;
+  position:relative;min-width:4px;
+  transition:filter .12s ease,opacity .12s ease;
+}
+.segment:hover{filter:brightness(1.12)}
+.segment[aria-pressed="false"]{opacity:.28}
+.segment span{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10px;font-weight:600;color:#fff;
+  letter-spacing:.02em;white-space:nowrap;overflow:hidden;
+}
+.legenda{
+  display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+}
+.legenda i{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:6px}
+
+/* ---------- werkbalk ---------- */
+.werkbalk{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 20px;background:var(--surface-2);
+  border-bottom:1px solid var(--line);
+}
+.zoekveld{
+  flex:1 1 240px;max-width:340px;
+  border:1px solid var(--line);border-radius:var(--r);
+  background:var(--surface);
+  padding:6px 10px;font-size:13px;
+}
+.schakel{
+  display:inline-flex;align-items:center;gap:7px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  cursor:pointer;user-select:none;
+  border:1px solid var(--line);border-radius:999px;
+  padding:5px 11px;background:var(--surface);
+}
+.schakel input{accent-color:var(--accent);margin:0}
+.schakel.aan{border-color:var(--accent);color:var(--accent);background:var(--accent-zacht)}
+.telling{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* ---------- splitweergave ---------- */
+.split{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,440px);
+  grid-template-rows:minmax(0,1fr);
+  gap:0;
+  flex:1 1 auto;min-height:0;
+}
+.lijst{
+  border-right:1px solid var(--line);background:var(--surface);
+  overflow-y:auto;min-height:0;
+}
+
+/* ---------- rij ---------- */
+.rij{
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr) auto;
+  gap:14px;
+  padding:14px 20px 14px 17px;
+  border-bottom:1px solid var(--line-zacht);
+  border-left:3px solid transparent;
+  cursor:pointer;
+  background:var(--surface);
+  transition:background .1s ease,border-left-color .1s ease;
+  text-align:left;width:100%;border-top:0;border-right:0;
+}
+.rij:hover{background:var(--surface-2)}
+.rij[aria-selected="true"]{background:var(--accent-zacht);border-left-color:var(--accent)}
+
+.tegel{
+  width:44px;height:44px;border-radius:var(--r);
+  border:1px solid var(--line-zacht);
+  background:var(--surface-2);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;position:relative;
+}
+.tegel img{width:100%;height:100%;object-fit:contain;padding:5px}
+.tegel .mono{
+  font-family:var(--cond);font-weight:700;font-size:15px;
+  letter-spacing:.02em;
+}
+.tegel::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:3px;
+  background:var(--bronkleur,transparent);
+}
+
+.rij h3{
+  margin:0 0 2px;font-size:15px;font-weight:600;line-height:1.3;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.rij .bedrijf{font-size:13px;color:var(--ink);font-weight:500}
+.rij .plaats{font-size:13px;color:var(--muted)}
+.rij .meta{
+  margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+}
+.tag{
+  font-family:var(--mono);font-size:10px;letter-spacing:.04em;
+  text-transform:uppercase;
+  border:1px solid var(--line);border-radius:3px;
+  padding:2px 6px;color:var(--muted);background:var(--surface);
+}
+.tag.bron{color:#fff;border-color:transparent}
+.tag.vlag{background:var(--signal-zacht);border-color:#E4CE93;color:#7A5A08;text-transform:none;letter-spacing:0}
+.tag.salaris{font-variant-numeric:tabular-nums}
+.rechts{
+  display:flex;flex-direction:column;align-items:flex-end;gap:6px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  white-space:nowrap;
+}
+
+/* ---------- detail ---------- */
+.detail{
+  overflow-y:auto;min-height:0;
+  background:var(--surface);
+  padding:22px 24px 40px;
+}
+.detail .kop{display:flex;gap:14px;align-items:flex-start;margin-bottom:16px}
+.detail h2{margin:0 0 4px;font-size:19px;line-height:1.25;font-weight:700}
+.detail .onder{color:var(--muted);font-size:13px}
+.detail .acties{display:flex;gap:8px;margin:16px 0 20px}
+.detail .beschrijving{
+  font-size:13.5px;line-height:1.65;color:#2A3038;
+  border-top:1px solid var(--line-zacht);padding-top:16px;
+  white-space:pre-wrap;
+}
+.leeg{
+  padding:60px 24px;text-align:center;color:var(--muted);
+}
+.leeg .eyebrow{display:block;margin-bottom:8px}
+
+/* ---------- zoekprofiel-paneel ---------- */
+.profiel{
+  display:grid;grid-template-rows:0fr;
+  overflow:hidden;
+  background:var(--surface);
+  transition:grid-template-rows .25s ease;
+}
+.profiel.open{grid-template-rows:1fr;border-bottom:1px solid var(--line)}
+/* Belangrijk: dit inklappende element mag geen verticale padding hebben. Met
+   grid-template-rows:0fr wordt de rijhoogte anders afgedwongen op die padding
+   (de rij kan niet kleiner dan de border-box van het item), waardoor de kopjes
+   bij een dicht paneel blijven uitsteken. Verticale ruimte staat daarom op de
+   kinderen (rooster en opslaan); horizontaal mag hier wel. */
+/* Verticaal scrollbaar met een plafond: het paneel is gegroeid (dagelijkse run)
+   en body staat op overflow:hidden, dus zonder dit valt de onderkant, inclusief
+   de Opslaan-knop, buiten beeld op een laptopscherm zonder dat je kunt scrollen.
+   max-height remt de open stand af; inklappen blijft werken omdat de lade zelf
+   op grid-template-rows:0fr staat en min-height:0 hier het krimpen toestaat. */
+.profiel-binnen{
+  overflow-y:auto;overflow-x:hidden;min-height:0;padding:0 20px;
+  max-height:min(70vh,640px);
+}
+.profiel-rooster{
+  display:grid;gap:16px 20px;padding-top:16px;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+}
+.veld{display:flex;flex-direction:column;gap:8px}
+.veld .eyebrow{margin:0}
+.veld-hint{margin:0;font-size:12px;color:var(--muted)}
+.veld-lijst{display:flex;flex-direction:column;gap:6px}
+.lijst-rij{display:flex;gap:6px;align-items:center}
+.lijst-rij input{
+  flex:1;min-width:0;
+  border:1px solid var(--line);border-radius:var(--r);
+  background:var(--surface);color:var(--ink);
+  padding:5px 8px;font-size:13px;
+}
+.verwijder{
+  flex:none;width:28px;height:28px;cursor:pointer;
+  border:1px solid var(--line);border-radius:var(--r);
+  background:var(--surface);color:var(--muted);
+  font-size:15px;line-height:1;
+}
+.verwijder:hover{border-color:var(--accent);color:var(--accent)}
+.knop.add{align-self:flex-start;padding:4px 10px;font-size:12px}
+.veld-schakels{display:flex;flex-direction:column;gap:8px;font-size:13px}
+.veld-schakels label,.veld-sites label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.veld-schakels input,.veld-sites input{accent-color:var(--accent);margin:0}
+.veld-sites{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;margin-top:4px}
+.veld-getallen{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px}
+.veld-getallen label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.veld-getallen input{
+  width:130px;padding:5px 8px;font-size:13px;
+  border:1px solid var(--line);border-radius:var(--r);
+  background:var(--surface);color:var(--ink);
+}
+.profiel-opslaan{
+  display:flex;align-items:center;gap:14px;
+  margin-top:16px;margin-bottom:20px;padding-top:14px;border-top:1px solid var(--line-zacht);
+}
+.status.ok{color:#2F7A5A}
+.status.fout{color:var(--signal)}
+
+/* ---------- oordeel: filter, rijmarkering en detailknoppen ---------- */
+.oordeelfilter,.sorteerfilter{
+  display:inline-flex;align-items:stretch;
+  border:1px solid var(--line);border-radius:999px;overflow:hidden;
+  background:var(--surface);
+}
+.segknop{
+  border:0;border-left:1px solid var(--line);background:none;cursor:pointer;
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  padding:5px 11px;transition:background .12s ease,color .12s ease;
+}
+.segknop:first-child{border-left:0}
+.segknop:hover{background:var(--surface-2)}
+.segknop.aan{background:var(--accent);color:#fff}
+
+/* Een ja-rij krijgt een groene rand aan de binnenkant (los van de selectierand);
+   een nee-rij wordt gedimd. */
+.rij.is-ja{box-shadow:inset 4px 0 0 var(--ja)}
+.rij.is-nee{opacity:.48}
+.rij.is-nee:hover{opacity:.7}
+.merk-ja{
+  font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  font-weight:700;color:var(--ja);
+}
+
+.oordeel-acties{display:flex;align-items:center;gap:8px;margin:0 0 18px}
+.knop.oordeel-ja.aan{background:var(--ja);border-color:var(--ja);color:#fff}
+.knop.oordeel-nee.aan{background:var(--muted);border-color:var(--muted);color:#fff}
+.knop-wis{
+  margin-left:auto;border:0;background:none;cursor:pointer;
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  text-decoration:underline;text-underline-offset:3px;padding:4px 2px;
+}
+.knop-wis:hover{color:var(--accent)}
+
+@media (max-width:1000px){
+  /* Smal scherm: terug naar normale paginascroll met lijst en detail onder elkaar. */
+  body{display:block;height:auto;overflow:visible}
+  .split{grid-template-columns:1fr;grid-template-rows:auto;overflow:visible}
+  .lijst{border-right:0;overflow:visible}
+  .detail{overflow:visible;border-top:8px solid var(--paper)}
+  .detail:empty{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+
+/* ---------- dagelijkse run (launchd) ---------- */
+/* Staat los van het profielrooster: dit schrijft naar launchd, niet naar
+   config.yaml, en hoort dus niet onder de Opslaan-knop te vallen. */
+.veld-breed{
+  display:flex;flex-direction:column;gap:8px;
+  padding:16px 0 4px;margin-top:16px;
+  border-top:1px solid var(--line);
+}
+.rooster-regel{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  font-size:13px;
+}
+.rooster-regel label{display:flex;align-items:center;gap:6px}
+.rooster-regel input[type=number]{
+  width:56px;border:1px solid var(--line);border-radius:var(--r);
+  background:var(--surface);padding:5px 8px;font-family:var(--mono);font-size:12px;
+}
+.veld-breed.uit{opacity:.55}
+
+/* tijdstippen in het rooster-paneel */
+.rooster-tijden{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tijd-rij{
+  display:inline-flex;align-items:center;gap:4px;
+  border:1px solid var(--line);border-radius:999px;
+  background:var(--surface);padding:3px 4px 3px 9px;
+}
+.tijd-rij input[type=number]{width:46px;border:0;background:none;padding:2px 0;text-align:center}
+.tijd-rij .verwijder{border:0;background:none;cursor:pointer;color:var(--muted);padding:0 5px;line-height:1}
+.tijd-rij .verwijder:hover{color:var(--signal)}

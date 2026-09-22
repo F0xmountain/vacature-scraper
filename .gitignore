@@ -1,0 +1,20 @@
+.venv/
+output/
+state.json
+beoordeling.json
+debug/
+__pycache__/
+.DS_Store
+run.txt
+webui/logocache/
+logs/
+Vacature Scraper.app/
+
+# Persoonlijk: je eigen zoekprofiel. Kopieer config.example.yaml naar config.yaml.
+config.yaml
+# Lokale Claude Code-instellingen (settings.json is wel gedeeld)
+.claude/settings.local.json
+# Bevat absolute paden naar deze machine; launchd/README.md legt uit hoe je hem maakt
+launchd/*.plist
+# Persoonlijke overdrachtsnotities
+HANDOFF.md

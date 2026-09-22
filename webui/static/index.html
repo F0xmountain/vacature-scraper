@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vacaturemonitor</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="balk">
+    <div class="merk">
+      <img class="logo" src="/logo.svg" alt="">
+      <h1>Vacaturemonitor</h1>
+    </div>
+    <div class="status"><span class="stip" id="stip"></span><span id="statustekst">laden...</span></div>
+    <button class="knop" id="btnProfiel">Zoekprofiel</button>
+    <button class="knop" id="btnToon">Zoek en toon</button>
+    <button class="knop primair" id="btnOnthoud">Zoek en onthoud</button>
+    <div class="laadbalk" id="laadbalk" hidden></div>
+  </header>
+
+  <section class="profiel" id="profiel" aria-label="Zoekprofiel">
+    <div class="profiel-binnen">
+      <div class="profiel-rooster">
+        <div class="veld">
+          <span class="eyebrow">Zoektermen</span>
+          <p class="veld-hint">Waarop de borden (LinkedIn, Indeed) worden doorzocht. Vrije tekst.</p>
+          <div class="veld-lijst" id="lijst-zoektermen"></div>
+          <button class="knop add" type="button" data-doel="lijst-zoektermen">+ toevoegen</button>
+        </div>
+
+        <div class="veld">
+          <span class="eyebrow">Zoeklocaties borden</span>
+          <p class="veld-hint">Waar de borden zoeken. Kale steden mogen; "Amsterdam" wordt bij het zoeken aangevuld tot "Amsterdam, Netherlands".</p>
+          <div class="veld-lijst" id="lijst-boards_locaties"></div>
+          <button class="knop add" type="button" data-doel="lijst-boards_locaties">+ toevoegen</button>
+        </div>
+
+        <div class="veld">
+          <span class="eyebrow">Toegestane locaties</span>
+          <p class="veld-hint">Het filter op alles wat is opgehaald. Substring-match op de locatietekst; een lege locatie wordt geflagd, niet gedropt.</p>
+          <div class="veld-lijst" id="lijst-locaties_toegestaan"></div>
+          <button class="knop add" type="button" data-doel="lijst-locaties_toegestaan">+ toevoegen</button>
+        </div>
+
+        <div class="veld">
+          <span class="eyebrow">Titel-uitsluitingen</span>
+          <p class="veld-hint">Harde drop op woordgrens. Deze titels halen de poort nooit.</p>
+          <div class="veld-lijst" id="lijst-titel_uitsluiten"></div>
+          <button class="knop add" type="button" data-doel="lijst-titel_uitsluiten">+ toevoegen</button>
+        </div>
+
+        <div class="veld">
+          <span class="eyebrow">Flags</span>
+          <p class="veld-hint">Markeren, niet droppen. De vacature blijft staan met een flag, zodat je zelf beoordeelt.</p>
+          <div class="veld-lijst" id="lijst-flag_termen"></div>
+          <button class="knop add" type="button" data-doel="lijst-flag_termen">+ toevoegen</button>
+        </div>
+
+        <div class="veld">
+          <span class="eyebrow">Bronnen</span>
+          <div class="veld-schakels">
+            <label><input type="checkbox" id="bron-boards_actief"> Borden (LinkedIn, Indeed)</label>
+            <label><input type="checkbox" id="bron-ats_actief"> ATS-feeds (AFM, Flow Traders, Optiver, IMC)</label>
+            <label><input type="checkbox" id="bron-magnetme_actief"> Magnet.me</label>
+            <label><input type="checkbox" id="bron-werkenbij_actief"> Werkenbij (DNB, Banken.nl)</label>
+          </div>
+          <span class="eyebrow">Bord-instellingen</span>
+          <div class="veld-sites">
+            <label><input type="checkbox" id="site-linkedin" value="linkedin"> linkedin</label>
+            <label><input type="checkbox" id="site-indeed" value="indeed"> indeed</label>
+            <label><input type="checkbox" id="site-glassdoor" value="glassdoor"> glassdoor</label>
+          </div>
+          <div class="veld-getallen">
+            <label>Resultaten per zoekterm
+              <input type="number" id="resultaten_per_term" min="5" max="100" step="5">
+            </label>
+            <label>Maximale ouderdom (uren)
+              <input type="number" id="max_uren_oud" min="24" max="336" step="24">
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="veld veld-breed" id="rooster-veld">
+        <span class="eyebrow">Dagelijkse run</span>
+        <p class="veld-hint">Draait de scraper automatisch via launchd. Dit is een
+          echte run: hij schrijft de xlsx weg en verbruikt nieuwheid. Slaapt je Mac
+          op dat moment, dan haalt hij de run in zodra hij wakker wordt.</p>
+        <div class="rooster-regel">
+          <label class="schakel"><input type="checkbox" id="rooster-aan"> automatische run aan</label>
+          <div class="rooster-tijden" id="rooster-tijden"></div>
+          <button class="knop add" type="button" id="btn-tijd-erbij">+ tijdstip</button>
+          <button class="knop" type="button" id="btn-rooster">Rooster opslaan</button>
+        </div>
+        <span class="status" id="rooster-status" role="status"></span>
+      </div>
+
+      <div class="profiel-opslaan">
+        <button class="knop primair" type="button" id="btn-opslaan">Opslaan in config.yaml</button>
+        <span class="status" id="opslaan-status" role="status"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="vangst">
+    <div class="vangst-kop">
+      <span class="eyebrow">Vangst per bron</span>
+      <span class="vangst-totaal"><b id="totaal">0</b> vacatures</span>
+      <button class="vangst-reset" id="reset" hidden>alle bronnen tonen</button>
+    </div>
+    <div class="balken" id="balken"></div>
+    <div class="legenda" id="legenda"></div>
+  </section>
+
+  <div class="werkbalk">
+    <input class="zoekveld" id="zoek" type="search" placeholder="Filter op functie, bedrijf of plaats">
+    <label class="schakel" id="labelVlag"><input type="checkbox" id="alleenVlag"> alleen met vlag</label>
+    <div class="oordeelfilter" id="oordeelfilter" role="group" aria-label="Filter op oordeel">
+      <button type="button" class="segknop aan" data-f="alles" aria-pressed="true">alles</button>
+      <button type="button" class="segknop" data-f="onbeoordeeld" aria-pressed="false">onbeoordeeld</button>
+      <button type="button" class="segknop" data-f="ja" aria-pressed="false">ja</button>
+      <button type="button" class="segknop" data-f="nee" aria-pressed="false">nee</button>
+    </div>
+    <div class="sorteerfilter" id="sorteerfilter" role="group" aria-label="Sorteervolgorde">
+      <button type="button" class="segknop aan" data-s="nieuw" aria-pressed="true">nieuwste eerst</button>
+      <button type="button" class="segknop" data-s="oud" aria-pressed="false">oudste eerst</button>
+      <button type="button" class="segknop" data-s="bron" aria-pressed="false">bronvolgorde</button>
+    </div>
+    <button class="knop" id="btnLaatste" title="Toon de laatst weggeschreven automatische run">Laatste run</button>
+    <button class="knop" id="btnExport">Exporteer ja-lijst</button>
+    <button class="knop" id="btnWisAlle">Wis alle oordelen</button>
+    <span class="telling" id="telling"></span>
+  </div>
+
+  <main class="split">
+    <section class="lijst" id="lijst" role="listbox" aria-label="Gevonden vacatures"></section>
+    <aside class="detail" id="detail"></aside>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

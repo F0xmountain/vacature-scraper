@@ -1,0 +1,6 @@
+# Alleen nodig voor de lokale configuratie-interface (config_ui.py).
+# De scraper zelf heeft deze niet nodig; die deps staan in requirements.txt.
+# Installeer dit bovenop requirements.txt: de interface gebruikt ook pandas,
+# en dat pakket staat in requirements.txt.
+streamlit>=1.60
+ruamel.yaml>=0.18

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./.venv/bin/python check.py)",
+      "Bash(./.venv/bin/python test_lokaal.py)",
+      "Edit(./**)"
+    ],
+    "deny": [
+      "Bash(*scraper.py*)",
+      "Edit(state.json)",
+      "Edit(store.py)",
+      "Edit(output.py)",
+      "Edit(config_io.py)"
+    ],
+    "defaultMode": "acceptEdits"
+  }
+}

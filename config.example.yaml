@@ -1,0 +1,115 @@
+# Voorbeeldconfiguratie. Kopieer naar config.yaml en pas aan:
+#
+#     cp config.example.yaml config.yaml
+#
+# config.yaml zelf staat in .gitignore, want dat is je persoonlijke zoekprofiel.
+# De waarden hieronder zijn een werkend voorbeeld, geen aanbeveling.
+
+# Waarop de borden (LinkedIn, Indeed) worden doorzocht. Meer termen betekent
+# evenredig meer requests; tien tot twintig is een werkbare balans.
+zoektermen:
+  - financial analyst
+  - business analyst
+  - data analyst
+  - analist
+
+boards:
+  actief: true
+  sites: [linkedin, indeed]            # 'google' kan erbij, levert soms dubbelingen
+  # Glassdoor eruit gelaten: gaf een 400 "location not parsed" op elke zoekterm,
+  # een bekende jobspy-bug met komma-locaties, en de NL-dekking overlapt met Indeed.
+  #
+  # Zoeklocaties voor de borden: WAAR er gezocht wordt. Elke zoekterm wordt per
+  # locatie apart bevraagd, dus dit vermenigvuldigt het aantal requests en
+  # vergroot de kans op een LinkedIn-429. Kale steden mogen; "Amsterdam" wordt
+  # bij het zoeken aangevuld tot "Amsterdam, Netherlands".
+  locaties:
+    - "Amsterdam, Netherlands"
+  land_indeed: netherlands
+  # Let op de vermenigvuldiging: zoektermen x locaties x resultaten_per_term.
+  # Dit is de eerste knop om terug te draaien als LinkedIn 429's gaat geven.
+  resultaten_per_term: 25
+  # Hoe ver de borden terugkijken. Stem dit af op je rooster: draai je twee keer
+  # per dag met twaalf uur ertussen, neem dan wat marge (bijvoorbeeld 16), want
+  # een run start zelden precies op tijd en elke vertraging die groter is dan de
+  # marge is een gat waar vacatures doorheen vallen.
+  # Eenmalig dieper kijken na een paar dagen weg:
+  #     ./.venv/bin/python scraper.py --dry-run --uren 72
+  max_uren_oud: 16
+  # true haalt per LinkedIn-vacature de functietekst op, serieel en voor het
+  # filteren. Laat dit uit: de omschrijvingen worden nu parallel opgehaald in
+  # sources_detail.py, pas na de poort en alleen voor wat overblijft.
+  linkedin_beschrijving: false
+
+# Het FILTER op alles wat is opgehaald, uit alle bronnen. Substring-match op de
+# locatietekst. Staat dit los van boards.locaties: dat bepaalt WAAR de borden
+# zoeken, dit bepaalt WAT er na het ophalen doorheen komt. Een zoeklocatie die
+# hier niet in staat levert dus niets op. Een lege locatie wordt niet gedropt,
+# die krijgt de flag 'locatie onbekend'.
+locaties_toegestaan:
+  - amsterdam
+  - amstelveen
+  - remote
+  - hybrid
+
+# Harde uitsluitingen op titel, op woordgrens en hoofdletterongevoelig. Bot met
+# opzet: 'manager' dropt "Risk Manager" maar niet "Risk Management Analyst".
+titel_uitsluiten:
+  - director
+  - manager
+  - sales
+  - recruiter
+  - stage
+  - intern
+  - werkstudent
+
+# Twijfeltermen: droppen niet, markeren wel. De gedachte erachter is dat een
+# touchpoint niet diskwalificeert en een kern wel, en dat dat verschil niet
+# machinaal vast te stellen is. De tool versmalt de trechter; jij beoordeelt.
+flag_termen:
+  - compliance
+  - kyc
+  - klantcontact
+  - commercieel
+
+# Omschrijvingen van detailpagina's ophalen (Magnet.me, werkenbij, LinkedIn).
+# Gebeurt parallel en pas na het filteren, dus alleen voor wat door de poort komt.
+detail_beschrijving: true
+
+ats:
+  actief: true
+  # Careers-feeds van specifieke bedrijven. Entry mag een kale slug zijn of
+  # {slug: ..., naam: ...} voor een nette werkgeversnaam in de output.
+  # Slug vinden en testen: zie README.
+  recruitee:
+    - {slug: werkenbijdeafm, naam: AFM}
+  greenhouse:
+    - {slug: flowtraders, naam: Flow Traders}
+  lever: []
+  workday: []          # lijst van {tenant, host, site, naam}, format in README
+
+werkenbij:
+  actief: true
+  # Eigen careers-sites met een servergerenderde vacaturelijst.
+  # Per site: naam, url, regex-patroon voor de vacaturelinks.
+  # Optioneel: stad (vaste locatie), bedrijf_regex (werkgever uit de link),
+  # titel_selector (als de link de hele kaart omvat) en json_veld (als de lijst
+  # als HTML-fragment in een JSON-veld zit, zoals bij Radancy-sites).
+  sites:
+    - naam: Banken.nl
+      bron: banken.nl
+      url: https://www.banken.nl/vacatures
+      patroon: '/vacatures/\d+/'
+      bedrijf_regex: '/vacatures/\d+/([a-z0-9-]+)/'
+
+magnetme:
+  actief: true
+  # Publieke overzichtspagina's onder magnet.me/nl-NL/, formaat banen/{stad}/{functie}.
+  # Steden moeten ook in locaties_toegestaan staan, anders wordt het opgehaald
+  # en daarna weggefilterd.
+  paden:
+    - banen/amsterdam/analyst
+    - banen/amsterdam/finance
+  paginas: 4      # pagina's per pad, circa 20 vacatures per pagina
+
+output_map: output

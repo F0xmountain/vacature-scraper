@@ -1,0 +1,10 @@
+# Rustig, professioneel thema voor config_ui.py.
+# Een accentkleur (gedempt blauw), verder neutrale grijstinten.
+# Aanpassen of weghalen mag; dit raakt alleen de weergave, niet de scraper.
+[theme]
+base = "light"
+primaryColor = "#3f6f9f"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f6f8"
+textColor = "#213040"
+font = "sans serif"
