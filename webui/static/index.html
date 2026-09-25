@@ -13,6 +13,10 @@
       <h1>Vacaturemonitor</h1>
     </div>
     <div class="status"><span class="stip" id="stip"></span><span id="statustekst">laden...</span></div>
+    <div class="weergavekeuze" role="group" aria-label="Weergave">
+      <button type="button" class="segknop aan" data-w="lijst" aria-pressed="true">Lijst</button>
+      <button type="button" class="segknop" data-w="analyse" aria-pressed="false">Analyse</button>
+    </div>
     <button class="knop" id="btnProfiel">Zoekprofiel</button>
     <button class="knop" id="btnToon">Zoek en toon</button>
     <button class="knop primair" id="btnOnthoud">Zoek en onthoud</button>
@@ -114,29 +118,44 @@
   </section>
 
   <div class="werkbalk">
-    <input class="zoekveld" id="zoek" type="search" placeholder="Filter op functie, bedrijf of plaats">
-    <label class="schakel" id="labelVlag"><input type="checkbox" id="alleenVlag"> alleen met vlag</label>
-    <div class="oordeelfilter" id="oordeelfilter" role="group" aria-label="Filter op oordeel">
-      <button type="button" class="segknop aan" data-f="alles" aria-pressed="true">alles</button>
-      <button type="button" class="segknop" data-f="onbeoordeeld" aria-pressed="false">onbeoordeeld</button>
-      <button type="button" class="segknop" data-f="ja" aria-pressed="false">ja</button>
-      <button type="button" class="segknop" data-f="nee" aria-pressed="false">nee</button>
-    </div>
-    <div class="sorteerfilter" id="sorteerfilter" role="group" aria-label="Sorteervolgorde">
-      <button type="button" class="segknop aan" data-s="nieuw" aria-pressed="true">nieuwste eerst</button>
-      <button type="button" class="segknop" data-s="oud" aria-pressed="false">oudste eerst</button>
-      <button type="button" class="segknop" data-s="bron" aria-pressed="false">bronvolgorde</button>
-    </div>
+    <input class="zoekveld" id="zoek" type="search" placeholder="Zoek op functie, bedrijf of plaats">
+    <select class="keuze" id="filterFamilie" aria-label="Filter op functie"></select>
+    <select class="keuze" id="filterBron" aria-label="Filter op bron"></select>
+    <select class="keuze" id="filterLocatie" aria-label="Filter op locatie"></select>
+    <select class="keuze" id="filterVaardigheid" aria-label="Filter op vaardigheid"></select>
+    <select class="keuze" id="filterOordeel" aria-label="Filter op oordeel">
+      <option value="alles">alle oordelen</option>
+      <option value="onbeoordeeld">onbeoordeeld</option>
+      <option value="ja">ja</option>
+      <option value="nee">nee</option>
+    </select>
+    <select class="keuze" id="filterVlag" aria-label="Filter op vlaggen">
+      <option value="">met en zonder vlag</option>
+      <option value="met">alleen met vlag</option>
+      <option value="zonder">alleen zonder vlag</option>
+    </select>
+    <select class="keuze" id="sorteer" aria-label="Sorteervolgorde">
+      <option value="nieuw">nieuwste eerst</option>
+      <option value="oud">oudste eerst</option>
+      <option value="bron">bronvolgorde</option>
+    </select>
+    <button class="knop wis" type="button" id="btnWisFilters" hidden>filters wissen</button>
     <button class="knop" id="btnLaatste" title="Toon de laatst weggeschreven automatische run">Laatste run</button>
     <button class="knop" id="btnExport">Exporteer ja-lijst</button>
     <button class="knop" id="btnWisAlle">Wis alle oordelen</button>
     <span class="telling" id="telling"></span>
   </div>
 
-  <main class="split">
+  <main class="split" id="weergaveLijst">
     <section class="lijst" id="lijst" role="listbox" aria-label="Gevonden vacatures"></section>
     <aside class="detail" id="detail"></aside>
   </main>
+
+  <section class="analyse" id="weergaveAnalyse" aria-label="Analyse" hidden>
+    <div class="kpi-rij" id="kpis"></div>
+    <div class="grafieken" id="grafieken"></div>
+    <p class="analyse-voet" id="analyseVoet"></p>
+  </section>
 
   <script src="/app.js"></script>
 </body>

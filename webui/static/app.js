@@ -11,6 +11,10 @@
 function naVacature(r) {
   return {
     sleutel: r.sleutel || "",
+    familie: r.familie || "overig",
+    vaardigheden: r.vaardigheden || [],
+    kern: r.kern || 0,
+    familieLabel: r.familie_label || "Overig",
     bron: r.bron || "",
     bedrijf: r.bedrijf || "",
     functie: r.functie || "",
@@ -279,13 +283,19 @@ function bronInfo(b) {
 
 let alles = [];
 let actief = null;
-let bronFilter = new Set();
 // sleutel -> "ja" | "nee". De dedupe-sleutel komt per rij van de server mee.
 let oordelen = {};
-// werkbalkfilter: "alles" | "onbeoordeeld" | "ja" | "nee".
-let oordeelFilter = "alles";
-// sorteervolgorde: "nieuw" | "oud" | "bron" (bron is de volgorde zoals de run hem levert).
-let sorteer = "nieuw";
+// De werkbalk is de enige plek waar filters staan; de dropdowns zijn de bron van
+// waarheid. Leeg betekent telkens: niet filteren op dit veld.
+const filters = {
+  familie: "",
+  bron: "",
+  locatie: "",
+  vaardigheid: "",
+  oordeel: "alles",
+  vlag: "",        // "" | "met" | "zonder"
+  sorteer: "nieuw", // "nieuw" | "oud" | "bron"
+};
 
 const $ = (id) => document.getElementById(id);
 
@@ -297,12 +307,21 @@ function zetStatus(soort, tekst) {
 function zichtbaar() {
   const q = $("zoek").value.trim().toLowerCase();
   const rijen = alles.filter((v) => {
-    if (bronFilter.size && !bronFilter.has(v.bron)) return false;
-    if ($("alleenVlag").checked && !(v.vlaggen || []).length) return false;
+    if (filters.bron && v.bron !== filters.bron) return false;
+    if (filters.familie && v.familie !== filters.familie) return false;
+    if (filters.locatie && plaatsSleutel(v.locatie) !== filters.locatie) return false;
+    if (filters.vaardigheid === "_kern") {
+      if ((v.kern || 0) < 2) return false;            // twee of meer signalen
+    } else if (filters.vaardigheid && !(v.vaardigheden || []).includes(filters.vaardigheid)) {
+      return false;
+    }
+    const vlaggen = (v.vlaggen || []).length;
+    if (filters.vlag === "met" && !vlaggen) return false;
+    if (filters.vlag === "zonder" && vlaggen) return false;
     const o = oordelen[v.sleutel] || "";
-    if (oordeelFilter === "onbeoordeeld" && o) return false;
-    if (oordeelFilter === "ja" && o !== "ja") return false;
-    if (oordeelFilter === "nee" && o !== "nee") return false;
+    if (filters.oordeel === "onbeoordeeld" && o) return false;
+    if (filters.oordeel === "ja" && o !== "ja") return false;
+    if (filters.oordeel === "nee" && o !== "nee") return false;
     if (q && !`${v.functie} ${v.bedrijf} ${v.locatie}`.toLowerCase().includes(q)) return false;
     return true;
   });
@@ -334,8 +353,8 @@ function sorteerTijd(v) {
 // niet: geen datum is onbekend, niet oud, en dat oordeel is aan de gebruiker.
 // Binnen gelijke datums blijft de oorspronkelijke volgorde staan.
 function sorteerLijst(rijen) {
-  if (sorteer === "bron") return rijen;
-  const richting = sorteer === "oud" ? 1 : -1;
+  if (filters.sorteer === "bron") return rijen;
+  const richting = filters.sorteer === "oud" ? 1 : -1;
   return rijen
     .map((v, i) => ({ v, i, t: sorteerTijd(v) }))
     .sort((a, b) => {
@@ -362,7 +381,7 @@ function tekenVangst() {
     b.className = "segment";
     b.style.flex = String(n);
     b.style.background = info.kleur;
-    b.setAttribute("aria-pressed", String(!bronFilter.size || bronFilter.has(bron)));
+    b.setAttribute("aria-pressed", String(!filters.bron || filters.bron === bron));
     b.title = `${info.vol}: ${n}`;
     const s = document.createElement("span");
     if (pct > 8) s.textContent = `${info.label} ${n}`;
@@ -370,8 +389,10 @@ function tekenVangst() {
     // onder de 3 procent: geen tekst in het segment, alleen de tooltip
     b.appendChild(s);
     b.onclick = () => {
-      if (bronFilter.has(bron)) bronFilter.delete(bron); else bronFilter.add(bron);
-      if (bronFilter.size === Object.keys(per).length) bronFilter.clear();
+      // Klikken op de strip zet de brondropdown; nog eens klikken zet hem terug
+      // op alle bronnen. Een bediening, twee ingangen, geen tweede filterstaat.
+      filters.bron = filters.bron === bron ? "" : bron;
+      $("filterBron").value = filters.bron;
       teken();
     };
     balken.appendChild(b);
@@ -382,7 +403,72 @@ function tekenVangst() {
     .join("");
 
   $("totaal").textContent = alles.length;
-  $("reset").hidden = bronFilter.size === 0;
+  $("reset").hidden = !filters.bron;
+}
+
+
+/* ============================================================
+   KEUZELIJSTEN. De opties komen uit de geladen vacatures, niet uit een
+   vaste lijst: zo staan er nooit keuzes in die niets opleveren, en
+   verschijnen nieuwe bronnen of functiefamilies vanzelf. De aantallen
+   staan erbij zodat je ziet wat een keuze je gaat kosten.
+   ============================================================ */
+
+function vulKeuze(id, paren, alleLabel) {
+  const el = $(id);
+  const huidig = el.value;
+  el.innerHTML = "";
+  const alles_ = document.createElement("option");
+  alles_.value = "";
+  alles_.textContent = alleLabel;
+  el.appendChild(alles_);
+  paren.forEach(([waarde, label, aantal]) => {
+    const o = document.createElement("option");
+    o.value = waarde;
+    o.textContent = `${label} (${aantal})`;
+    el.appendChild(o);
+  });
+  // Stond er een keuze die nu niet meer bestaat, val dan terug op alles.
+  el.value = Array.from(el.options).some((o) => o.value === huidig) ? huidig : "";
+}
+
+function tel(sleutelVan, labelVan) {
+  const per = new Map();
+  alles.forEach((v) => {
+    const k = sleutelVan(v);
+    if (!k) return;
+    const r = per.get(k) || { label: labelVan(v), n: 0 };
+    r.n += 1;
+    per.set(k, r);
+  });
+  return Array.from(per, ([k, r]) => [k, r.label, r.n]).sort((a, b) => b[2] - a[2]);
+}
+
+function vulKeuzelijsten() {
+  vulKeuze("filterFamilie", tel((v) => v.familie, (v) => v.familieLabel), "alle functies");
+  vulKeuze("filterBron", tel((v) => v.bron, (v) => bronInfo(v.bron).label), "alle bronnen");
+  vulKeuze("filterLocatie", tel((v) => plaatsSleutel(v.locatie), (v) => plaatsLabel(v.locatie)), "alle locaties");
+
+  // Vaardigheden: een vacature kan er meerdere hebben, dus niet via tel().
+  const perV = new Map();
+  alles.forEach((v) => (v.vaardigheden || []).forEach((n) => perV.set(n, (perV.get(n) || 0) + 1)));
+  const metKern = alles.filter((v) => (v.kern || 0) >= 2).length;
+  const opties = Array.from(perV, ([n, aantal]) => [n, n, aantal]).sort((a, b) => b[2] - a[2]);
+  if (metKern) opties.unshift(["_kern", "twee of meer datasignalen", metKern]);
+  vulKeuze("filterVaardigheid", opties, "alle vaardigheden");
+  filters.vaardigheid = $("filterVaardigheid").value;
+  // De filterstaat volgt de dropdowns, voor het geval een keuze is weggevallen.
+  filters.familie = $("filterFamilie").value;
+  filters.bron = $("filterBron").value;
+  filters.locatie = $("filterLocatie").value;
+}
+
+// De wis-knop verschijnt alleen als er echt iets te wissen valt.
+function markeerFilters() {
+  const actiefFilter = !!(filters.familie || filters.bron || filters.locatie ||
+    filters.vaardigheid || filters.vlag || filters.oordeel !== "alles" ||
+    $("zoek").value.trim());
+  $("btnWisFilters").hidden = !actiefFilter;
 }
 
 function maakRij(v, i) {
@@ -404,6 +490,7 @@ function maakRij(v, i) {
     <div class="meta">
       <span class="tag bron" style="background:${info.kleur}">${esc(info.label)}</span>
       ${v.salaris ? `<span class="tag salaris">${esc(v.salaris)}</span>` : ""}
+      ${(v.kern || 0) >= 2 ? `<span class="tag kern" title="${esc((v.vaardigheden || []).join(", "))}">${v.kern} datasignalen</span>` : ""}
       ${(v.vlaggen || []).map((f) => `<span class="tag vlag">${esc(f)}</span>`).join("")}
     </div>`;
   rij.appendChild(midden);
@@ -434,8 +521,121 @@ function teken() {
     rijen.forEach((v, i) => lijst.appendChild(maakRij(v, i)));
   }
   $("telling").textContent = `${rijen.length} van ${alles.length} getoond`;
-  $("labelVlag").classList.toggle("aan", $("alleenVlag").checked);
+  markeerFilters();
+  if (weergave === "analyse") tekenAnalyse();
   tekenVangst();
+}
+
+
+/* ============================================================
+   ANALYSE. Rekent op de vacatures die nu zichtbaar zijn, dus de
+   filters werken door: zet je de functie op Analist, dan gaat de
+   vaardighedengrafiek daarover.
+
+   Alle grafieken zijn magnitudevergelijkingen met een reeks, dus een
+   staaf per categorie in een kleur. Donkerder-is-groter zou de lengte
+   dubbel coderen en het enige vrije kanaal verbranden aan iets dat de
+   staaf al laat zien. Kleur draagt hier dus bewust geen informatie;
+   het label doet dat.
+   ============================================================ */
+
+let weergave = "lijst";
+
+function kpiTegel(waarde, label, toelichting) {
+  return `<div class="kpi" ${toelichting ? `title="${esc(toelichting)}"` : ""}>
+    <b>${waarde}</b><span>${esc(label)}</span></div>`;
+}
+
+// paren: [sleutel, label, aantal]. klik zet optioneel een filter.
+function staafGrafiek(titel, paren, opties = {}) {
+  if (!paren.length) return "";
+  const top = Math.max(...paren.map((p) => p[2]));
+  const rijen = paren.slice(0, opties.limiet || 12).map(([sleutel, label, n]) => {
+    const pct = (n / top) * 100;
+    return `<button class="staaf-rij" data-filter="${esc(opties.filter || "")}" data-waarde="${esc(sleutel)}"
+              title="${esc(label)}: ${n}">
+      <span class="staaf-label">${esc(label)}</span>
+      <span class="staaf-baan"><span class="staaf" style="width:${pct}%"></span></span>
+      <span class="staaf-waarde">${n}</span>
+    </button>`;
+  }).join("");
+  const rest = paren.length > (opties.limiet || 12)
+    ? `<p class="staaf-rest">en nog ${paren.length - (opties.limiet || 12)} andere</p>` : "";
+  return `<section class="grafiek"><span class="eyebrow">${esc(titel)}</span>
+    <div class="staven">${rijen}</div>${rest}</section>`;
+}
+
+function tekenAnalyse() {
+  const rijen = zichtbaar();
+  const n = rijen.length;
+  if (!n) {
+    $("kpis").innerHTML = "";
+    $("grafieken").innerHTML = `<div class="leeg"><span class="eyebrow">Niets te analyseren</span>
+      Geen vacature past bij deze filters.</div>`;
+    $("analyseVoet").textContent = "";
+    return;
+  }
+
+  const kern2 = rijen.filter((v) => (v.kern || 0) >= 2).length;
+  const onbeoordeeld = rijen.filter((v) => !oordelen[v.sleutel]).length;
+  const metTekst = rijen.filter((v) => v.beschrijving).length;
+  $("kpis").innerHTML =
+    kpiTegel(n, "in beeld") +
+    kpiTegel(kern2, "met 2+ datasignalen", "Vacatures die twee of meer termen noemen die op echt data-werk wijzen") +
+    kpiTegel(onbeoordeeld, "nog te beoordelen") +
+    kpiTegel(new Set(rijen.map((v) => v.bedrijf).filter(Boolean)).size, "werkgevers");
+
+  // Vaardigheden: meerdere per vacature, dus apart tellen.
+  const perV = new Map();
+  rijen.forEach((v) => (v.vaardigheden || []).forEach((k) => perV.set(k, (perV.get(k) || 0) + 1)));
+  const vaardig = Array.from(perV, ([k, a]) => [k, k, a]).sort((a, b) => b[2] - a[2]);
+
+  const telOp = (sleutelVan, labelVan) => {
+    const m = new Map();
+    rijen.forEach((v) => {
+      const k = sleutelVan(v);
+      if (!k) return;
+      const r = m.get(k) || { label: labelVan(v), n: 0 };
+      r.n += 1; m.set(k, r);
+    });
+    return Array.from(m, ([k, r]) => [k, r.label, r.n]).sort((a, b) => b[2] - a[2]);
+  };
+
+  $("grafieken").innerHTML =
+    staafGrafiek("Functiefamilie", telOp((v) => v.familie, (v) => v.familieLabel), { filter: "familie" }) +
+    staafGrafiek("Gevraagde vaardigheden", vaardig, { filter: "vaardigheid", limiet: 14 }) +
+    staafGrafiek("Werkgevers die het meest werven", telOp((v) => v.bedrijf, (v) => v.bedrijf), { limiet: 12 }) +
+    staafGrafiek("Locatie", telOp((v) => plaatsSleutel(v.locatie) || "_onbekend", (v) => plaatsLabel(v.locatie) || "locatie onbekend"), { filter: "locatie" }) +
+    staafGrafiek("Bron", telOp((v) => v.bron, (v) => bronInfo(v.bron).label), { filter: "bron" });
+
+  // Klikken op een staaf zet het bijbehorende filter.
+  $("grafieken").querySelectorAll(".staaf-rij").forEach((b) => {
+    const sleutel = b.dataset.filter;
+    if (!sleutel) { b.classList.add("niet-klikbaar"); return; }
+    b.onclick = () => {
+      filters[sleutel] = filters[sleutel] === b.dataset.waarde ? "" : b.dataset.waarde;
+      const veld = { familie: "filterFamilie", bron: "filterBron", locatie: "filterLocatie",
+                     vaardigheid: "filterVaardigheid" }[sleutel];
+      if (veld) $(veld).value = filters[sleutel];
+      teken();
+    };
+  });
+
+  $("analyseVoet").textContent =
+    `Gerekend over ${n} vacatures, waarvan ${metTekst} met omschrijving. ` +
+    `Vaardigheden komen uit de omschrijving: een vermelding is geen eis, dus lees het als een aanwijzing en niet als een cijfer.`;
+}
+
+function kiesWeergave(w) {
+  weergave = w;
+  $("weergaveLijst").hidden = w !== "lijst";
+  $("weergaveAnalyse").hidden = w !== "analyse";
+  document.querySelectorAll(".weergavekeuze .segknop").forEach((b) => {
+    const aan = b.dataset.w === w;
+    b.classList.toggle("aan", aan);
+    b.setAttribute("aria-pressed", String(aan));
+  });
+  teken();
 }
 
 function tekenDetail() {
@@ -491,6 +691,22 @@ function tekenDetail() {
     setTimeout(() => { e.target.textContent = "Kopieer link"; }, 1600);
   };
 
+  // Gevraagde vaardigheden uit de omschrijving. Bewust boven de tekst: het is
+  // het snelste antwoord op "heeft deze rol een echte analytische kern". Geen
+  // oordeel; een vermelding in een bedrijfsprofiel telt hier net zo zwaar als
+  // een harde eis, en dat verschil is niet machinaal vast te stellen.
+  if ((v.vaardigheden || []).length) {
+    const vk = document.createElement("div");
+    vk.className = "vaardigheden";
+    const kop = (v.kern || 0) >= 2
+      ? `Genoemde vaardigheden &middot; <b>${v.kern} datasignalen</b>`
+      : "Genoemde vaardigheden";
+    vk.innerHTML = `<span class="eyebrow">${kop}</span><div class="v-tags">` +
+      v.vaardigheden.map((n) => `<span class="tag v">${esc(n)}</span>`).join("") +
+      `</div>`;
+    d.appendChild(vk);
+  }
+
   const b = document.createElement("div");
   b.className = "beschrijving";
   b.textContent = v.beschrijving ||
@@ -503,8 +719,9 @@ function vul(data) {
   actief = null;
   // Werkstand: staan er al oordelen op de geladen set, start dan op 'onbeoordeeld',
   // want dat is wat er nog te doen valt. Anders gewoon alles tonen.
-  oordeelFilter = alles.some((v) => oordelen[v.sleutel]) ? "onbeoordeeld" : "alles";
-  markeerOordeelFilter();
+  filters.oordeel = alles.some((v) => oordelen[v.sleutel]) ? "onbeoordeeld" : "alles";
+  $("filterOordeel").value = filters.oordeel;
+  vulKeuzelijsten();
   teken();
   tekenDetail();
 }
@@ -512,6 +729,14 @@ function vul(data) {
 /* hulpjes */
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function kortePlaats(l) { return String(l || "").split(",")[0].trim(); }
+// Groeperen en filteren op plaats moet hoofdletterongevoelig: de borden leveren
+// "Amsterdam, NH" en de werkenbij-bronnen een kale "amsterdam". Zonder dit staan
+// dezelfde stad twee keer in de lijst en mist het filter de helft.
+function plaatsSleutel(l) { return kortePlaats(l).toLowerCase(); }
+function plaatsLabel(l) {
+  const p = kortePlaats(l);
+  return p ? p.charAt(0).toUpperCase() + p.slice(1) : "";
+}
 function datum(d) {
   const dt = new Date(d);
   if (isNaN(dt)) return d;
@@ -594,35 +819,6 @@ function volgendeOnbeoordeeld(oudZicht, i) {
   return nu[Math.min(start, nu.length - 1)];
 }
 
-function markeerSorteer() {
-  document.querySelectorAll("#sorteerfilter .segknop").forEach((b) => {
-    const aan = b.dataset.s === sorteer;
-    b.classList.toggle("aan", aan);
-    b.setAttribute("aria-pressed", String(aan));
-  });
-}
-
-function kiesSorteer(s) {
-  sorteer = s;
-  markeerSorteer();
-  teken();
-}
-
-function markeerOordeelFilter() {
-  document.querySelectorAll("#oordeelfilter .segknop").forEach((b) => {
-    const aan = b.dataset.f === oordeelFilter;
-    b.classList.toggle("aan", aan);
-    b.setAttribute("aria-pressed", String(aan));
-  });
-}
-
-function kiesOordeelFilter(f) {
-  oordeelFilter = f;
-  markeerOordeelFilter();
-  teken();
-  tekenDetail();
-}
-
 // De ja-lijst als csv, in de browser opgebouwd uit wat al geladen is.
 function exporteerJa() {
   const kolommen = ["functie", "bedrijf", "locatie", "bron", "geplaatst", "url"];
@@ -671,8 +867,8 @@ async function wisAlleOordelen() {
   }
   // Zonder oordelen is 'onbeoordeeld' hetzelfde als 'alles'; zet 'm op alles zodat
   // een ja- of nee-filter niet op een lege lijst blijft staan.
-  oordeelFilter = "alles";
-  markeerOordeelFilter();
+  filters.oordeel = "alles";
+  $("filterOordeel").value = "alles";
   teken();
   tekenDetail();
 }
@@ -880,14 +1076,26 @@ function toggleProfiel() {
 }
 
 /* bediening */
-["zoek", "alleenVlag"].forEach((id) => $(id).addEventListener("input", teken));
-$("reset").onclick = () => { bronFilter.clear(); teken(); };
-document.querySelectorAll("#oordeelfilter .segknop").forEach((b) => {
-  b.onclick = () => kiesOordeelFilter(b.dataset.f);
-});
-document.querySelectorAll("#sorteerfilter .segknop").forEach((b) => {
-  b.onclick = () => kiesSorteer(b.dataset.s);
-});
+$("zoek").addEventListener("input", teken);
+$("reset").onclick = () => { filters.bron = ""; $("filterBron").value = ""; teken(); };
+[["filterFamilie", "familie"], ["filterBron", "bron"], ["filterLocatie", "locatie"],
+ ["filterVaardigheid", "vaardigheid"], ["filterOordeel", "oordeel"],
+ ["filterVlag", "vlag"], ["sorteer", "sorteer"]]
+  .forEach(([id, sleutel]) => {
+    $(id).addEventListener("change", (e) => {
+      filters[sleutel] = e.target.value;
+      teken();
+      tekenDetail();
+    });
+  });
+$("btnWisFilters").onclick = () => {
+  Object.assign(filters, { familie: "", bron: "", locatie: "", vaardigheid: "", oordeel: "alles", vlag: "" });
+  $("zoek").value = "";
+  ["filterFamilie", "filterBron", "filterLocatie", "filterVaardigheid", "filterVlag"]
+    .forEach((id) => ($(id).value = ""));
+  $("filterOordeel").value = "alles";
+  teken();
+};
 $("btnLaatste").onclick = laadBewaardeRun;
 $("btnExport").onclick = exporteerJa;
 $("btnWisAlle").onclick = wisAlleOordelen;
@@ -901,6 +1109,9 @@ $("btnOnthoud").onclick = () => {
   );
   if (akkoord) startRun(true);
 };
+document.querySelectorAll(".weergavekeuze .segknop").forEach((b) => {
+  b.onclick = () => kiesWeergave(b.dataset.w);
+});
 $("btnProfiel").onclick = toggleProfiel;
 $("btn-opslaan").onclick = opslaan;
 $("rooster-aan").onchange = (e) => {
@@ -956,7 +1167,6 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-markeerSorteer();
 laadProfiel();
 laadRooster();
 // Oordelen eerst laden zodat de rijen meteen goed gemarkeerd staan en het filter

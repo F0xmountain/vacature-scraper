@@ -41,6 +41,13 @@ import oordeel
 # webui/rooster.py is de enige schrijfroute naar launchd (de dagelijkse run).
 import rooster
 
+# webui/functies.py deelt titels in functiefamilies in, puur voor het filter.
+import functies
+
+# webui/vaardigheden.py haalt genoemde vaardigheden uit de omschrijving. Markeert
+# alleen, net als flag_termen; er wordt niets mee gedropt of gerangschikt.
+import vaardigheden
+
 STATIC = Path(__file__).resolve().parent / "static"
 HOST, POORT = "127.0.0.1", 8500
 
@@ -159,6 +166,9 @@ def _rijen(jobs):
     return [
         {
             "sleutel": store.job_key(j),
+            # Alleen voor het filter in de interface; dit dropt of rangschikt niets.
+            "familie": functies.familie(j.get("functie", "")),
+            "familie_label": functies.label(functies.familie(j.get("functie", ""))),
             "functie": j.get("functie", ""),
             "bedrijf": j.get("bedrijf", ""),
             "locatie": j.get("locatie", ""),
@@ -168,9 +178,22 @@ def _rijen(jobs):
             "bron": j.get("bron", ""),
             "salaris": j.get("salaris", ""),
             "beschrijving": _kort_beschrijving(j.get("beschrijving")),
+            # Op de volledige tekst, niet op de afgekapte versie: anders zouden
+            # vaardigheden die achterin staan stilletjes wegvallen.
+            **_vaardigheden(j.get("beschrijving")),
         }
         for j in jobs
     ]
+
+
+def _vaardigheden(tekst):
+    gevonden = vaardigheden.uit_tekst(tekst)
+    return {
+        "vaardigheden": gevonden,
+        # Telling, geen oordeel: hoeveel van de gevonden termen wijzen op echt
+        # data-werk. Excel en taal tellen niet mee, die zeggen te weinig.
+        "kern": vaardigheden.kernsignalen(gevonden),
+    }
 
 
 def _nu():
