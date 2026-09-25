@@ -7,9 +7,14 @@
     ],
     "deny": [
       "Bash(*scraper.py*)",
+      "Edit(scraper.py)",
+      "Bash(*state.json*)",
       "Edit(state.json)",
+      "Bash(*store.py*)",
       "Edit(store.py)",
+      "Bash(*output.py*)",
       "Edit(output.py)",
+      "Bash(*config_io.py*)",
       "Edit(config_io.py)"
     ],
     "defaultMode": "acceptEdits"

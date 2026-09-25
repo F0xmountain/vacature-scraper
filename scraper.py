@@ -1,4 +1,4 @@
-"""Vacature-scraper voor Bas Vossenberg.
+"""Dagelijkse monitor voor junior analytische finance-rollen rond Amsterdam.
 
     python scraper.py              normale run, schrijft xlsx en onthoudt wat gezien is
     python scraper.py --dry-run    toont resultaat in beeld, schrijft niets weg
