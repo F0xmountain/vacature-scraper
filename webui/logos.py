@@ -34,6 +34,11 @@ MAX_BYTES = 200 * 1024          # een favicon of logo is nooit groter
 TIMEOUT = 4                     # seconden; de pagina mag hier niet op wachten
 TIMEOUT_EIGEN = 2               # korter voor het domein zelf; een dood domein mag niet ophouden
 MISS_TTL = 14 * 24 * 3600       # een mislukking twee weken onthouden
+# Een tegel is 44 css-pixels, op een retinascherm dus 88. Alles onder de 32 wordt
+# daarop onherkenbaar wazig; een schoon monogram is dan beter dan een vlek. En
+# onder de 64 blijven we doorzoeken naar iets scherpers.
+MIN_PIXELS = 32
+GOED_PIXELS = 64
 TYPES = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
@@ -80,7 +85,7 @@ DOMEIN = {
     "adyen": "adyen.com",
     "mollie": "mollie.com",
     "kpmg": "kpmg.nl",
-    "deloitte": "deloitte.nl",
+    "deloitte": "deloitte.com",
     "pwc": "pwc.nl",
     "cboe": "cboe.com",
     "zanders": "zanders.eu",
@@ -91,7 +96,7 @@ DOMEIN = {
     "handelsbanken": "handelsbanken.nl",
     "accenture": "accenture.com",
     "alvarez & marsal": "alvarezandmarsal.com",
-    "mckinsey": "mckinsey.com",
+    "mckinsey": "www.mckinsey.com",
     "capgemini": "capgemini.com",
     "grant thornton": "grantthornton.nl",
     "kpn": "kpn.com",
@@ -100,12 +105,35 @@ DOMEIN = {
     "picnic": "picnic.app",
     "hema": "hema.nl",
     "atradius": "atradius.com",
-    "politie": "politie.nl",
+    "politie": "www.politie.nl",
     "magnet.me": "magnet.me",
     "nn": "nn-group.com",
     "alvarez marsal": "alvarezandmarsal.com",
     "tony s chocolonely": "tonyschocolonely.com",
-    "deutsche": "db.com"
+    "deutsche": "db.com",
+    # Bekende Nederlandse instellingen en werkgevers waarvan het domein niet uit
+    # de naam te raden is: NS heet ns.nl, Defensie defensie.nl, enzovoort.
+    "ministerie van defensie": "defensie.nl",
+    "defensie": "defensie.nl",
+    "nederlandse spoorwegen": "ns.nl",
+    "ns": "ns.nl",
+    "erasmus university rotterdam": "eur.nl",
+    "erasmus universiteit rotterdam": "eur.nl",
+    "universiteit van amsterdam": "uva.nl",
+    "vrije universiteit": "vu.nl",
+    "technische universiteit delft": "tudelft.nl",
+    "universiteit utrecht": "uu.nl",
+    "rijksoverheid": "rijksoverheid.nl",
+    "de rijksoverheid": "rijksoverheid.nl",
+    "belastingdienst": "belastingdienst.nl",
+    "forvis mazars": "forvismazars.com",
+    "mazars": "forvismazars.com",
+    "provincie noord holland": "noord-holland.nl",
+    "waternet": "waternet.nl",
+    "schiphol": "schiphol.nl",
+    "royal schiphol group": "schiphol.nl",
+    "tata steel": "tatasteeleurope.com",
+    "port of amsterdam": "portofamsterdam.com",
 }
 
 # Namen waar de gok het verkeerde logo oplevert; die gokken we nooit, ook niet via
@@ -122,7 +150,10 @@ DOMEIN_OK = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9-]{1,63})+
 # ---------------------------------------------------------------- naam -> domein
 
 def normaliseer(naam):
-    n = unicodedata.normalize("NFD", (naam or "").lower())
+    # Alles achter een pijp of gedachtestreepje is bij werkgeversnamen vrijwel
+    # altijd een slagzin ("VNOM | We get the job done") en hoort niet bij de naam.
+    naam = re.split(r"\s*[|]\s*", naam or "", 1)[0]
+    n = unicodedata.normalize("NFD", naam.lower())
     n = "".join(c for c in n if unicodedata.category(c) != "Mn")
     n = re.sub(r"\b(b\.?v\.?|n\.?v\.?|holding|group|nederland|netherlands|amsterdam)\b", " ", n)
     n = re.sub(r"[^a-z0-9. ]", " ", n)
@@ -154,7 +185,11 @@ def _domein_uit_lijst(n):
 
 # Staarten die alleen bij het gokken hinderen; bewust niet in normaliseer, want
 # de DOMEIN-lijst kent sleutels als "bng bank" en "imc trading".
-_STAARTEN = re.compile(r"\b(investment banking|corporate|bank|nederland|nl)\b")
+_STAARTEN = re.compile(
+    r"\b(investment banking|corporate|bank|nederland|nl|the netherlands|"
+    r"in the netherlands|recruitment|recruiting|consultancy|consulting|"
+    r"services|solutions|professionals|people|talent|careers|werkenbij)\b"
+)
 
 
 def _strip_staarten(n):
@@ -179,13 +214,33 @@ def domeinen_voor(bedrijf):
     if "." in n and " " not in n:
         kandidaten = [n]
     else:
-        g = _strip_staarten(n)
-        woorden = [w for w in g.split(" ") if w]
-        if 1 <= len(woorden) <= 2 and 3 <= len(g) <= 18:
+        # Twee vormen, specifiek voor algemeen. De volledige naam eerst, want die
+        # is het minst dubbelzinnig: "doghouserecruitment" hoort bij dat bureau,
+        # terwijl "doghouse" van wie dan ook kan zijn. Pas als die niets oplevert
+        # proberen we de vorm zonder ruiswoorden.
+        #
+        # De oude regel liet alleen namen van hoogstens twee woorden en achttien
+        # tekens door. Dat staat de zaak omgekeerd: juist een korte generieke naam
+        # kan van een ander bedrijf zijn, terwijl een lange samengestelde naam van
+        # niemand anders is en hooguit een 404 oplevert.
+        kandidaten = []
+
+        def voegtoe(woorden):
             basis = "".join(woorden)
-            kandidaten = [basis + ".com", basis + ".nl"]
-        else:
-            kandidaten = []
+            if not (1 <= len(woorden) <= 4 and 3 <= len(basis) <= 40):
+                return
+            # .com voor .nl, zoals het origineel deed. Een misser valt gewoon door
+            # naar de volgende kandidaat, dus de volgorde telt alleen wanneer
+            # beide bestaan; dan is het bedrijfsdomein vaker .com dan een
+            # Nederlandse naamgenoot.
+            for d in (basis + ".com", basis + ".nl",
+                      ("-".join(woorden) + ".nl") if len(woorden) >= 2 else None):
+                if d and d not in kandidaten:
+                    kandidaten.append(d)
+
+        voegtoe([w for w in n.split(" ") if w])
+        voegtoe([w for w in _strip_staarten(n).split(" ") if w])
+
     # Weiger IP-achtige kandidaten: het laatste label van een echt domein is nooit
     # alleen cijfers.
     return [d for d in kandidaten if not d.rsplit(".", 1)[-1].isdigit()]
@@ -234,7 +289,12 @@ _opener.addheaders = [("User-Agent", "vacature-scraper/1.0 (lokaal)")]
 # Google geeft dan geen 404 maar een generiek wereldbol-icoon; dat herkennen we
 # aan zijn hash zodat we het niet als logo bewaren.
 _DDG = "https://icons.duckduckgo.com/ip3/%s.ico"
-_GOOGLE = "https://www.google.com/s2/favicons?domain=%s&sz=64"
+_GOOGLE = "https://www.google.com/s2/favicons?domain=%s&sz=256"
+# Derde dienst zonder sleutel. Gemeten op dertig van je eigen werkgevers wint deze
+# in zes gevallen van Google, waarvan drie waar Google helemaal niets teruggeeft en
+# een waar hij van 16 naar 256 pixels gaat. Wordt alleen geraadpleegd als Google
+# niets bruikbaars gaf, dus normaal kost hij geen extra verkeer.
+_ICONHORSE = "https://icon.horse/icon/%s"
 
 # Domein dat gegarandeerd niet bestaat (.invalid is daarvoor gereserveerd), om
 # eenmalig het wereldbol-icoon van Google op te halen.
@@ -265,6 +325,47 @@ def _haal_url(url, timeout=TIMEOUT):
     return data, TYPES[ct]
 
 
+def _afmeting(data, ext):
+    """Grootste zijde in pixels, uit de bestandskop. None als het niet te lezen is.
+
+    Bewust met de hand en niet met Pillow: de interface draait nu zonder
+    beeldbibliotheek en dat wil ik zo houden. PNG en ICO zijn samen het leeuwendeel
+    van wat er binnenkomt en die koppen zijn triviaal; lukt het lezen niet, dan
+    geven we None terug en laat de aanroeper het plaatje gewoon door.
+    """
+    try:
+        if ext == ".png" and data[:8] == b"\x89PNG\r\n\x1a\n":
+            w = int.from_bytes(data[16:20], "big")
+            h = int.from_bytes(data[20:24], "big")
+            return max(w, h)
+        if ext == ".ico" and data[:4] == b"\x00\x00\x01\x00":
+            aantal = int.from_bytes(data[4:6], "little")
+            beste = 0
+            for i in range(aantal):
+                o = 6 + i * 16
+                w = data[o] or 256          # 0 betekent 256 in het ico-formaat
+                h = data[o + 1] or 256
+                beste = max(beste, w, h)
+            return beste
+        if ext == ".gif" and data[:3] == b"GIF":
+            return max(int.from_bytes(data[6:8], "little"),
+                       int.from_bytes(data[8:10], "little"))
+        if ext == ".jpg" and data[:2] == b"\xff\xd8":
+            i = 2
+            while i + 9 < len(data):
+                if data[i] != 0xFF:
+                    i += 1
+                    continue
+                merk = data[i + 1]
+                if 0xC0 <= merk <= 0xCF and merk not in (0xC4, 0xC8, 0xCC):
+                    return max(int.from_bytes(data[i + 5:i + 7], "big"),
+                               int.from_bytes(data[i + 7:i + 9], "big"))
+                i += 2 + int.from_bytes(data[i + 2:i + 4], "big")
+    except (IndexError, ValueError):
+        pass
+    return None
+
+
 def _globe_hash():
     """sha256 van het generieke wereldbol-icoon van Google, eenmalig per proces
     opgehaald en onthouden. Zo verwerpen we die terugval zonder een hash hard in de
@@ -281,33 +382,68 @@ def _globe_hash():
 def _haal(domein):
     """Geeft (bytes, extensie) of (None, None).
 
-    Keten: eerst DuckDuckGo, dan Google (het wereldbol-icoon verwerpen we via de
-    hash uit _globe_hash), dan het domein zelf.
+    Keten op volgorde van te verwachten scherpte: eerst Google (die levert op
+    sz=256 in de praktijk 180 tot 256 pixels), dan DuckDuckGo, dan het domein zelf.
+    Die laatste twee geven vrijwel altijd een favicon van 16 of 32.
+
+    Eerder stond DuckDuckGo vooraan. Die slaagt bijna altijd, dus Google kwam nooit
+    aan bod en vrijwel elk logo was een favicon van 32 pixels. Op een tegel van 44
+    is dat zichtbaar wazig.
+
+    We nemen niet zomaar de eerste treffer: een bron onder GOED_PIXELS wordt
+    onthouden maar we zoeken door, en uiteindelijk wint de grootste. Onder
+    MIN_PIXELS valt af; dan is het monogram netter.
     """
     if not DOMEIN_OK.match(domein) or len(domein) > 100:
         return None, None
 
-    data, ext = _haal_url(_DDG % domein)
-    if data:
-        return data, ext
+    beste, beste_maat = (None, None), 0
 
-    data, ext = _haal_url(_GOOGLE % domein)
-    if data:
+    def weeg(data, ext):
+        """True als dit goed genoeg is om te stoppen met zoeken."""
+        nonlocal beste, beste_maat
+        if not data:
+            return False
+        maat = _afmeting(data, ext)
+        if maat is not None and maat < MIN_PIXELS:
+            return False                      # te klein, negeren
+        # Niet te lezen formaat (webp): behandelen als net goed genoeg.
+        gewicht = maat if maat is not None else GOED_PIXELS
+        if gewicht > beste_maat:
+            beste, beste_maat = (data, ext), gewicht
+        return gewicht >= GOED_PIXELS
+
+    # Google's faviconsdienst is kieskeurig op de exacte host: voor sommige
+    # domeinen geeft het kale domein niets terwijl www. wel 256 pixels oplevert
+    # (gemeten op mckinsey.com en politie.nl). Daarom bij een misser eenmalig
+    # met www. ervoor. Alleen bij een misser, dus het kost normaal geen extra
+    # request.
+    varianten = [domein] if domein.startswith("www.") else [domein, "www." + domein]
+    for host in varianten:
+        data, ext = _haal_url(_GOOGLE % host)
+        if not data:
+            continue
         globe = _globe_hash()
         if globe and hashlib.sha256(data).hexdigest() == globe:
-            return None, None
-        return data, ext
+            continue
+        if weeg(data, ext):
+            return beste
+        break
+
+    if weeg(*_haal_url(_ICONHORSE % domein)):
+        return beste
+
+    if weeg(*_haal_url(_DDG % domein)):
+        return beste
 
     # Derde schakel: het domein zelf. Dit is de enige host die uit een gescrapete
     # naam is afgeleid, dus controleer hier expliciet dat hij publiek routeerbaar is
     # voordat we iets opvragen. De redirect-handler in _opener herkeurt bovendien
     # elke doorverwijzing. Korte timeout: een dood domein mag de pagina niet ophouden.
     if _publiek(domein):
-        data, ext = _haal_url("https://%s/favicon.ico" % domein, timeout=TIMEOUT_EIGEN)
-        if data:
-            return data, ext
+        weeg(*_haal_url("https://%s/favicon.ico" % domein, timeout=TIMEOUT_EIGEN))
 
-    return None, None
+    return beste
 
 
 # ---------------------------------------------------------------- cache
