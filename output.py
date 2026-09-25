@@ -1,11 +1,14 @@
 """Export: nieuwe vacatures naar een xlsx per run, plus een cumulatieve csv.
 
-Daarnaast laatste_run.json: dezelfde vacatures, maar met de omschrijving erbij.
-De xlsx en de csv hebben die kolom bewust niet (een cel van achtduizend tekens
-leest niet), terwijl de run de tekst wel ophaalt om er flags mee te bepalen.
-Zonder dit bestand werd die tekst na afloop weggegooid en moest de webinterface
-alles opnieuw ophalen om hem te tonen: een halfuur wachten op iets wat om 08:30
-al binnen was.
+De xlsx heeft een samenvatting plus de gevonden vaardigheden; de volledige
+tekst blijft eruit, want die lees je niet in een cel. De csv houdt bewust de
+oude negen kolommen, omdat hij wordt aangevuld en een kop van negen al vast
+ligt.
+
+Daarnaast laatste_run.json: dezelfde vacatures, maar met de volledige
+omschrijving erbij. Zonder dat bestand werd die tekst na afloop weggegooid en
+moest de webinterface alles opnieuw ophalen om hem te tonen: een halfuur
+wachten op iets wat om 08:00 al binnen was.
 """
 import json
 from datetime import datetime
@@ -14,15 +17,49 @@ from pathlib import Path
 import pandas as pd
 from openpyxl.utils import get_column_letter
 
+import vaardigheden
+
+
 COLS = [
     "eerste_keer_gezien", "bedrijf", "functie", "locatie",
-    "geplaatst", "salaris", "bron", "flags", "url",
+    "geplaatst", "salaris", "bron", "flags",
+    "datasignalen", "vaardigheden", "samenvatting", "url",
 ]
 HEADERS = [
     "Gezien", "Bedrijf", "Functie", "Locatie",
-    "Geplaatst", "Salaris", "Bron", "Flags", "URL",
+    "Geplaatst", "Salaris", "Bron", "Flags",
+    "Datasignalen", "Vaardigheden", "Samenvatting", "URL",
 ]
-BREEDTES = [11, 26, 44, 20, 12, 20, 20, 24, 10]
+BREEDTES = [11, 26, 44, 20, 12, 20, 20, 24, 12, 34, 70, 10]
+
+# De csv houdt bewust de oude negen kolommen. Hij wordt aangevuld met
+# mode="a" en de kop wordt alleen geschreven als het bestand nog niet
+# bestaat; nieuwe kolommen toevoegen zou dus twaalf waarden onder een kop
+# van negen plakken en het hele logboek stilletjes scheeftrekken.
+CSV_COLS = [
+    "eerste_keer_gezien", "bedrijf", "functie", "locatie",
+    "geplaatst", "salaris", "bron", "flags", "url",
+]
+
+
+def _samenvatting(tekst, limiet=300):
+    """Eerste stuk van de omschrijving, afgekapt op een woordgrens.
+
+    De volledige tekst gaat bewust niet de xlsx in. Hij past wel (de langste
+    is 15.861 tekens, ruim onder Excels celgrens van 32.767), maar 4.500
+    tekens in een cel lees je alleen in de formulebalk. Drie compacte
+    kolommen zeggen hier meer dan een muur proza: de eerste driehonderd
+    tekens vertellen al waar de rol over gaat, en op vaardigheden en
+    datasignalen kun je sorteren en filteren, wat een spreadsheet juist
+    goed kan.
+    """
+    t = " ".join((tekst or "").split())
+    if len(t) <= limiet:
+        return t
+    knip = t[:limiet]
+    spatie = knip.rfind(" ")
+    return (knip[:spatie] if spatie > 0 else knip).rstrip() + "..."
+
 
 
 def export(nieuwe_jobs, cfg):
@@ -30,11 +67,20 @@ def export(nieuwe_jobs, cfg):
     outdir.mkdir(exist_ok=True)
 
     df = pd.DataFrame(nieuwe_jobs)
+    # Afgeleid uit de omschrijving, die zelf niet in de xlsx belandt.
+    df["samenvatting"] = [_samenvatting(j.get("beschrijving")) for j in nieuwe_jobs]
+    gevonden = [vaardigheden.uit_tekst(j.get("beschrijving")) for j in nieuwe_jobs]
+    df["vaardigheden"] = [", ".join(v) for v in gevonden]
+    df["datasignalen"] = [vaardigheden.kernsignalen(v) for v in gevonden]
     for c in COLS:
         if c not in df.columns:
             df[c] = ""
     df = df[COLS].fillna("").astype(str)
     df = df.replace({"NaT": "", "None": "", "nan": ""})
+    # Terug naar een getal: astype(str) hierboven maakt er tekst van, en dan
+    # sorteert Excel deze kolom alfabetisch in plaats van op grootte.
+    df["datasignalen"] = pd.to_numeric(df["datasignalen"], errors="coerce").fillna(0).astype(int)
+
     df = df.sort_values("geplaatst", ascending=False)
 
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
@@ -56,7 +102,7 @@ def export(nieuwe_jobs, cfg):
         ws.freeze_panes = "A2"
 
     master = outdir / "alle_vacatures.csv"
-    df.to_csv(
+    df[CSV_COLS].to_csv(
         master, mode="a", header=not master.exists(),
         index=False, encoding="utf-8-sig",
     )
