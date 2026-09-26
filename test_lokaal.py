@@ -6,8 +6,6 @@ en ruimt zichzelf op. Handig om te checken of de installatie werkt.
 import shutil
 from pathlib import Path
 
-import yaml
-
 import store
 from filters import apply_filters
 from output import export
@@ -153,12 +151,152 @@ def main():
     assert rows[0]["bedrijf"] == "De Nederlandsche Bank", "bedrijf_regex faalt"
     assert rows[0]["functie"] == "Junior toezichthouder", "banken.nl titel faalt"
 
+    test_bedrijf_uitsluiten()
+    test_functies()
+    test_vaardigheden()
+    test_runvenster(cfg)
+    test_linkedin_datum()
+    test_rooster_tijden()
+    test_werkenbij_opties()
+
     print(f"Alle checks OK. Testbestand: {pad.name}")
 
-    shutil.rmtree(HIER / "output_test", ignore_errors=True)
-    (HIER / "state_test.json").unlink(missing_ok=True)
-    print("Testbestanden opgeruimd. Installatie werkt.")
+
+def test_bedrijf_uitsluiten():
+    """Uitsluiten op werkgever, op woordgrens net als bij titels."""
+    cfg = {"locaties_toegestaan": ["amsterdam"], "bedrijf_uitsluiten": ["marriott"]}
+    jobs = [{"functie": "Analist", "bedrijf": "Marriott International", "locatie": "Amsterdam"},
+            {"functie": "Analist", "bedrijf": "Rabobank", "locatie": "Amsterdam"},
+            {"functie": "Analist", "bedrijf": "", "locatie": "Amsterdam"}]
+    kept, stats = apply_filters([dict(j) for j in jobs], cfg)
+    assert len(kept) == 2, f"bedrijf_uitsluiten: verwacht 2 over, kreeg {len(kept)}"
+    assert stats["bedrijf"] == 1, "bedrijf-drop wordt niet geteld"
+    assert all("marriott" not in (j["bedrijf"] or "").lower() for j in kept)
+    # Een ontbrekend veld mag niets veranderen; oudere configs moeten blijven werken.
+    kaal, st = apply_filters([dict(j) for j in jobs], {"locaties_toegestaan": ["amsterdam"]})
+    assert len(kaal) == 3 and st["bedrijf"] == 0, "ontbrekend veld verandert gedrag"
+
+
+def test_functies():
+    """Indeling in families; de volgorde bepaalt de uitkomst."""
+    import functies
+    verwacht = {
+        "Credit Risk Analyst": "analist",      # analist wint van risk
+        "Compliance Officer": "risk",          # geen analistenterm, dus wel risk
+        "Business Controller": "controller",
+        "Data Engineer": "data",
+        "Wax Specialist": "overig",
+    }
+    for titel, fam in verwacht.items():
+        echt = functies.familie(titel)
+        assert echt == fam, f"functies: {titel!r} -> {echt}, verwacht {fam}"
+    assert functies.label("analist") == "Analist"
+    assert functies.familie("") == "overig", "lege titel moet overig geven"
+
+
+def test_vaardigheden():
+    """Vaardigheden uit tekst, en de telling van datasignalen."""
+    import vaardigheden as V
+    tekst = "Je werkt met Excel, SQL en Python aan forecasting. Nederlands vereist."
+    gevonden = V.uit_tekst(tekst)
+    for v in ("Excel", "SQL", "Python", "forecasting", "Nederlands"):
+        assert v in gevonden, f"vaardigheden: {v} niet gevonden"
+    # Excel en taal tellen niet mee als datasignaal; SQL, Python en forecasting wel.
+    assert V.kernsignalen(gevonden) == 3, f"kernsignalen: {V.kernsignalen(gevonden)}"
+    assert V.uit_tekst("") == [], "lege tekst moet een lege lijst geven"
+    # Hoofdlettergevoelig, anders matcht 'sas' en 'ra' overal op.
+    assert "SAS" in V.uit_tekst("ervaring met SAS en Python")
+    assert "SAS" not in V.uit_tekst("hij was bezig met de kassa")
+
+
+def test_runvenster(cfg):
+    """bewaar_run en lees_laatste_run: het venster mag niets kwijtraken."""
+    from output import BEWAAR_RUNS, bewaar_run, lees_laatste_run
+    pad = HIER / "output_test" / "laatste_run.json"
+    pad.unlink(missing_ok=True)
+
+    def job(n):
+        return {"bron": "linkedin", "bedrijf": f"B{n}", "functie": f"F{n}",
+                "locatie": "Amsterdam", "geplaatst": "2026-09-26", "salaris": "",
+                "flags": "", "url": f"https://example.com/{n}",
+                "beschrijving": f"tekst {n}", "eerste_keer_gezien": "2026-09-26",
+                "_detail": True}
+
+    bewaar_run([job(1), job(2)], cfg)
+    bewaar_run([job(2), job(3)], cfg)          # overlap op url
+    d = lees_laatste_run(cfg)
+    assert d["runs"] == 2, f"venster telt {d['runs']} runs"
+    assert d["aantal"] == 3, f"ontdubbelen op url faalt: {d['aantal']}"
+    # Nieuwste run eerst, binnen een run de oorspronkelijke volgorde. F2 zat in
+    # beide runs en telt mee vanaf zijn nieuwste voorkomen, dus voor F1.
+    assert [j["functie"] for j in d["jobs"]] == ["F2", "F3", "F1"], \
+        f"volgorde klopt niet: {[j['functie'] for j in d['jobs']]}"
+    assert d["jobs"][0]["beschrijving"], "omschrijving gaat verloren"
+    assert "_detail" not in d["jobs"][0], "interne vlag lekt het bestand in"
+
+    bewaar_run([], cfg)                        # lege run wist het venster niet
+    assert lees_laatste_run(cfg)["aantal"] == 3, "lege run wist eerdere vangst"
+
+    for i in range(BEWAAR_RUNS + 2):
+        bewaar_run([job(100 + i)], cfg)
+    assert lees_laatste_run(cfg)["runs"] == BEWAAR_RUNS, "venster kapt niet af"
+
+
+def test_linkedin_datum():
+    """Plaatsingsdatum uit de detailpagina; jobspy mist die bij verse vacatures."""
+    from datetime import date, timedelta
+    from sources_detail import _linkedin_datum
+    vandaag = date.today()
+    for tekst, dagen in [("11 hours ago", 0), ("1 day ago", 1),
+                         ("2 days ago", 2), ("1 week ago", 7)]:
+        html = f'<span class="posted-time-ago__text">{tekst}</span>'
+        verwacht = (vandaag - timedelta(days=dagen)).isoformat()
+        assert _linkedin_datum(html) == verwacht, f"datum uit {tekst!r} faalt"
+    assert _linkedin_datum("<span>geen datum hier</span>") == ""
+    assert _linkedin_datum("") == ""
+
+
+def test_rooster_tijden():
+    """Roosterblok lezen en opbouwen, beide vormen."""
+    import sys
+    sys.path.insert(0, str(HIER / "webui"))
+    import rooster
+    enkel = ("<key>StartCalendarInterval</key><dict>"
+             "<key>Hour</key><integer>8</integer>"
+             "<key>Minute</key><integer>30</integer></dict>")
+    assert rooster._lees_tijden(enkel) == [[8, 30]], "enkele dict wordt niet gelezen"
+    meervoud = "<key>StartCalendarInterval</key>" + rooster._blok([[20, 0], [8, 0]])
+    assert rooster._lees_tijden(meervoud) == [[8, 0], [20, 0]], "array wordt niet gesorteerd gelezen"
+    assert rooster._lees_tijden("<key>Iets anders</key>") == []
+
+
+def test_werkenbij_opties():
+    """json_veld en titel_selector: nodig voor Radancy-sites zoals DNB."""
+    import json as _json
+    from sources_html import _html_uit, _parse
+
+    class NepRespons:
+        text = '{"results": "<a href=\'/nl/banen/x/y/1/2\'><h2>Analist</h2>extra tekst</a>"}'
+        def json(self):
+            return _json.loads(self.text)
+
+    site = {"naam": "DNB", "bron": "werkenbijdnb", "url": "https://example.invalid/x",
+            "json_veld": "results", "patroon": r"/nl/banen/", "titel_selector": "h2",
+            "stad": "amsterdam"}
+    rows = _parse(_html_uit(NepRespons(), site), site)
+    assert len(rows) == 1, f"json_veld: verwacht 1 rij, kreeg {len(rows)}"
+    assert rows[0]["functie"] == "Analist", f"titel_selector faalt: {rows[0]['functie']!r}"
+    # Zonder json_veld blijft het pad ongewijzigd: gewone HTML uit de body.
+    zonder = {k: v for k, v in site.items() if k != "json_veld"}
+    assert _html_uit(NepRespons(), zonder) == NepRespons.text
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        # Ook opruimen als een assert faalt, anders blijft er rommel staan die de
+        # volgende run vertroebelt.
+        shutil.rmtree(HIER / "output_test", ignore_errors=True)
+        (HIER / "state_test.json").unlink(missing_ok=True)
+        print("Testbestanden opgeruimd.")

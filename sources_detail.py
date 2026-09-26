@@ -19,9 +19,11 @@ werkenbij-sites gaan om tientallen requests en hebben die rem niet nodig, dus de
 snelheid daar blijft zoals hij was.
 """
 import concurrent.futures as cf
+import re
 import threading
 import time
 from collections import Counter, defaultdict
+from datetime import date, timedelta
 from urllib.parse import urlsplit
 
 import requests
@@ -59,6 +61,38 @@ _BACKOFF_SEC = 5
 _SELECTORS = (
     ("linkedin.com/jobs/view", "div.show-more-less-html__markup"),
 )
+
+
+# LinkedIn noemt de plaatsingsdatum op de detailpagina als "11 hours ago" of
+# "2 days ago", in precies een element.
+_LI_DATUM = re.compile(
+    r'class="[^"]*posted-time-ago__text[^"]*"[^>]*>\s*([^<]{1,40}?)\s*<', re.I
+)
+_RELATIEF = re.compile(r"(\d+)\s+(minute|hour|day|week|month)s?\s+ago", re.I)
+_PER_EENHEID = {"minute": 0, "hour": 0, "day": 1, "week": 7, "month": 30}
+
+
+def _linkedin_datum(html):
+    """Plaatsingsdatum uit een LinkedIn-detailpagina als ISO-datum, of "".
+
+    Nodig omdat jobspy de datum mist bij verse vacatures. LinkedIn geeft die in de
+    zoekresultaten de klasse job-search-card__listdate--new, en jobspy zoekt alleen
+    op job-search-card__listdate. Bij een korte terugkijktijd is vrijwel alles vers,
+    dus verdween de datum bijna overal: gemeten op 26-09-2026 nog 2 procent dekking
+    op de borden, tegen 78 procent in juli toen het venster ruimer stond.
+
+    De detailpagina halen we hier toch al op voor de omschrijving, dus dit kost
+    geen extra verkeer. De uitkomst is op de dag nauwkeurig, net als bij de andere
+    bronnen; "11 hours ago" wordt dus vandaag.
+    """
+    m = _LI_DATUM.search(html or "")
+    if not m:
+        return ""
+    r = _RELATIEF.search(m.group(1))
+    if not r:
+        return ""
+    dagen = int(r.group(1)) * _PER_EENHEID[r.group(2).lower()]
+    return (date.today() - timedelta(days=dagen)).isoformat()
 
 
 def _selector_voor(url):
@@ -114,6 +148,9 @@ def _een(job, pacer, mislukt):
                 continue
             r.raise_for_status()
             job["beschrijving"] = uit_pagina(r.text, _selector_voor(url))
+            # Datum meepakken als de bron hem niet gaf; zie _linkedin_datum.
+            if not (job.get("geplaatst") or "").strip() and "linkedin.com/jobs/view" in url:
+                job["geplaatst"] = _linkedin_datum(r.text)
             return
         except Exception as e:
             if poging == _POGINGEN:

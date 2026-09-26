@@ -137,6 +137,8 @@ Of `./start-webui.sh`, dat hetzelfde doet maar losgekoppeld start, wacht tot de
 server luistert, en de browser opent. Geen tweede server als er al een draait.
 Open anders zelf http://127.0.0.1:8500; de server luistert alleen op loopback.
 
+Drie weergaven, te kiezen in de kopbalk: **Lijst**, **Analyse** en **Info**.
+
 Wat de interface kan:
 
 - **Profiel bewerken en opslaan**, comment-behoudend naar `config.yaml`
@@ -148,12 +150,48 @@ Wat de interface kan:
   bewaard, zodat een batch die je nog niet hebt bekeken niet verdwijnt
 - **Beoordelen met ja/nee**, met pijltjestoetsen en automatisch doorspringen naar
   de volgende onbeoordeelde; het oordeel overleeft runs via de dedupe-sleutel
+- **Filteren met dropdowns** op functie, bron, locatie, plaatsingsdatum,
+  vaardigheid, oordeel en vlaggen. De opties komen uit de geladen vacatures met
+  hun aantal erachter, dus er staat nooit een keuze in die niets oplevert
 - **Sorteren** op meest recent geplaatst, met vacatures zonder datum onderaan
   (geen datum is onbekend, niet oud)
-- **Filteren** op bron, op vlag en op oordeel, plus een csv-export van je ja-lijst
-- **Automatische run bedienen**: aan of uit, en de tijdstippen beheren. Schrijft
-  via `webui/rooster.py` naar launchd en vervangt alleen het
-  `StartCalendarInterval`-blok in de plist, zodat de comments blijven staan
+- **Automatische run bedienen**: aan of uit, en de tijdstippen beheren
+- Een csv-export van je ja-lijst
+
+### Functiefamilies, vaardigheden en de scherpe trechter
+
+Titels worden met trefwoorden in twaalf families ingedeeld (`functies.py`). De
+eerste die raakt wint, dus "Credit Risk Analyst" is een analist en geen risk-rol.
+Ongeveer driekwart valt in een familie; de rest heet Overig.
+
+Uit de omschrijving worden genoemde vaardigheden gehaald (`vaardigheden.py`):
+gereedschap, methoden, diploma's en taal. Het aantal **datasignalen** telt daarvan
+alleen wat op echt data-werk wijst; Excel telt niet mee omdat elke kantoorvacature
+het noemt, en taal evenmin.
+
+Dat is er omdat aan een titel niet te zien is of de analytische kern echt is,
+maar aan de omschrijving wel. De knop **Scherpe trechter** zet in een klik twee
+filters tegelijk: functie op de kernrollen (analist, controller, finance, risk) en
+vaardigheid op twee of meer datasignalen. Op een venster van 1478 vacatures bleven
+er 78 over. Nog een klik en hij staat uit; er wordt niets weggegooid.
+
+Een vermelding is geen eis. "Wij werken met Python" in een bedrijfsprofiel telt
+hier net zo zwaar als een harde eis, en dat verschil is niet machinaal vast te
+stellen. Lees het als aanwijzing, niet als cijfer.
+
+### Analyse
+
+Een KPI-rij en vijf staafgrafieken over wat er na je filters overblijft: per
+functiefamilie, per gevraagde vaardigheid, de meest wervende werkgevers, per
+locatie en per bron. Klikken op een staaf zet dat filter.
+
+Let op bij de werkgeversgrafiek: die meet wie het meest **plaatst**, niet wie het
+meest aanneemt. Uitzendbureaus en doorplaatsers staan er daardoor hoog in.
+
+### Info
+
+Uitleg over de hele keten, plus je werkelijke instellingen live uit de server
+gelezen in plaats van in de tekst geschreven, zodat de uitleg niet achterloopt.
 
 ## Draaien
 
@@ -189,6 +227,12 @@ derde van het werk gedaan.
 - `zoektermen`: waarop de borden doorzocht worden. Meer termen betekent meer requests; tien is een goede balans.
 - `boards.locaties`: WAAR de borden zoeken (LinkedIn, Indeed). Elke zoekterm wordt per locatie apart bevraagd, dus meer locaties betekent evenredig meer requests en meer kans op een LinkedIn-429. Voorgevuld: Amsterdam en Rotterdam. Een zoeklocatie hoort ook in `locaties_toegestaan` te staan, anders wordt zijn resultaat wel opgehaald maar daarna weggefilterd. Ontbreekt dit veld, dan valt de scraper terug op het oude enkele veld `locatie`. Kale steden mogen: "Amsterdam" wordt bij het zoeken aangevuld tot "Amsterdam, Netherlands", tenzij je zelf al een komma typt.
 - `titel_uitsluiten`: harde drops op woordgrens. `manager` dropt "Risk Manager" maar niet "Risk Management Analyst".
+- `bedrijf_uitsluiten`: harde drop op werkgever, zelfde werking als
+  `titel_uitsluiten`. Bedoeld voor herhalers waarvan je zeker weet dat ze nooit
+  iets hebben. Let op bij bemiddelaars en grote kantoren: gemeten leverde een
+  uitzendbureau 21 ruisvacatures maar ook 69 relevante. Filteren op de
+  omschrijving is bewust niet mogelijk; sectorwoorden komen daar vaker terloops
+  voor in relevante vacatures dan als kenmerk in ruis.
 - `flag_termen`: droppen niet, markeren wel. Compliance-touchpoints horen hier, een compliance-kern beoordeel je zelf in de listing.
 - `locaties_toegestaan`: het FILTER op alles wat is opgehaald, uit alle bronnen. Substring-match op de locatietekst; onbekende locatie wordt bewaard met flag. Dit staat los van `boards.locaties`: dat veld bepaalt WAAR de borden zoeken, dit bepaalt WAT er na het ophalen doorheen komt. Een zoeklocatie die hier niet in staat, levert dus niets op.
 - `max_uren_oud`: stem af op je rooster. Twee runs per dag met twaalf uur

@@ -41,22 +41,42 @@ def _allowed(cfg):
 
 
 def split_drop(jobs, cfg):
-    """Drop-fase: harde titel-uitsluiting en locatiecheck. Geeft (kept, stats).
+    """Drop-fase: harde uitsluiting op titel en werkgever, plus de locatiecheck.
 
-    Gebruikt de omschrijving niet, zodat deze fase voor het ophalen van de
-    omschrijvingen kan draaien. Een lege locatie wordt niet gedropt (die krijgt in
-    wijs_flags de flag 'locatie onbekend'); de flags komen daar, niet hier.
+    Geeft (kept, stats). Gebruikt de omschrijving niet, zodat deze fase voor het
+    ophalen van de omschrijvingen kan draaien. Een lege locatie wordt niet gedropt
+    (die krijgt in wijs_flags de flag 'locatie onbekend'); de flags komen daar.
+
+    bedrijf_uitsluiten werkt net als titel_uitsluiten: op woordgrens en
+    hoofdletterongevoelig, dus "marriott" dropt "Marriott International".
+
+    Waarom uitsluiten op werkgever en niet op de omschrijving: dat laatste is
+    gemeten en het werkt niet. Sectorwoorden komen in een omschrijving vaker
+    terloops voor dan als kenmerk; "zorg" stond in 162 ruisvacatures maar ook in
+    489 relevante, "retail" in 26 tegen 62. Een werkgever is daarentegen eenduidig:
+    een hotelketen heeft nooit een analistenrol voor je.
+
+    Wel oppassen bij bemiddelaars en grote kantoren. In dezelfde meting leverde
+    Jobster 21 ruisvacatures maar ook 69 relevante, PwC 3 tegen 12 en Deloitte 2
+    tegen 11. Zet hier dus alleen werkgevers neer waarvan je zeker weet dat ze
+    nooit iets voor je hebben.
     """
     excl = _compile(cfg.get("titel_uitsluiten"))
+    excl_bedrijf = _compile(cfg.get("bedrijf_uitsluiten"))
     allowed = _allowed(cfg)
 
     kept = []
-    stats = {"totaal": len(jobs), "titel": 0, "locatie": 0}
+    stats = {"totaal": len(jobs), "titel": 0, "bedrijf": 0, "locatie": 0}
 
     for job in jobs:
         titel = (job.get("functie") or "").lower()
         if any(p.search(titel) for _, p in excl):
             stats["titel"] += 1
+            continue
+
+        bedrijf = (job.get("bedrijf") or "").lower()
+        if bedrijf and any(p.search(bedrijf) for _, p in excl_bedrijf):
+            stats["bedrijf"] += 1
             continue
 
         loc = (job.get("locatie") or "").lower()

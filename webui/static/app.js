@@ -291,6 +291,7 @@ const filters = {
   familie: "",
   bron: "",
   locatie: "",
+  datum: "",
   vaardigheid: "",
   oordeel: "alles",
   vlag: "",        // "" | "met" | "zonder"
@@ -298,6 +299,10 @@ const filters = {
 };
 
 const $ = (id) => document.getElementById(id);
+
+// De vier families waar jouw zoekopdracht om draait. Als groep in de dropdown,
+// want los kun je er maar een kiezen en juist de combinatie is de trechter.
+const KERNROLLEN = ["analist", "controller", "finance", "risk"];
 
 function zetStatus(soort, tekst) {
   $("stip").className = "stip " + soort;
@@ -308,8 +313,13 @@ function zichtbaar() {
   const q = $("zoek").value.trim().toLowerCase();
   const rijen = alles.filter((v) => {
     if (filters.bron && v.bron !== filters.bron) return false;
-    if (filters.familie && v.familie !== filters.familie) return false;
+    if (filters.familie === "_kernrollen") {
+      if (!KERNROLLEN.includes(v.familie)) return false;
+    } else if (filters.familie && v.familie !== filters.familie) {
+      return false;
+    }
     if (filters.locatie && plaatsSleutel(v.locatie) !== filters.locatie) return false;
+    if (filters.datum && !binnenDatum(v)) return false;
     if (filters.vaardigheid === "_kern") {
       if ((v.kern || 0) < 2) return false;            // twee of meer signalen
     } else if (filters.vaardigheid && !(v.vaardigheden || []).includes(filters.vaardigheid)) {
@@ -414,6 +424,30 @@ function tekenVangst() {
    staan erbij zodat je ziet wat een keuze je gaat kosten.
    ============================================================ */
 
+
+// Datumfilter. Vacatures zonder datum verdwijnen hier niet stilletijd: ze hebben
+// een eigen keuze in de lijst met hun aantal erbij, zodat je altijd ziet hoeveel
+// er zijn. Magnet.me, Banken.nl en Consultancy.nl leveren nooit een datum, en
+// geen datum betekent onbekend, niet oud.
+function dagenOud(v) {
+  const t = sorteerTijd(v);
+  if (t === null) return null;
+  const vandaag = new Date();
+  vandaag.setHours(0, 0, 0, 0);
+  return Math.round((vandaag - new Date(t).setHours(0, 0, 0, 0)) / 864e5);
+}
+
+function binnenDatum(v) {
+  const d = dagenOud(v);
+  if (filters.datum === "geen") return d === null;
+  if (d === null) return false;          // datumkeuze gemaakt, deze heeft er geen
+  if (filters.datum === "vandaag") return d <= 0;
+  if (filters.datum === "3d") return d <= 3;
+  if (filters.datum === "week") return d <= 7;
+  if (filters.datum === "ouder") return d > 7;
+  return true;
+}
+
 function vulKeuze(id, paren, alleLabel) {
   const el = $(id);
   const huidig = el.value;
@@ -445,7 +479,12 @@ function tel(sleutelVan, labelVan) {
 }
 
 function vulKeuzelijsten() {
-  vulKeuze("filterFamilie", tel((v) => v.familie, (v) => v.familieLabel), "alle functies");
+  const families = tel((v) => v.familie, (v) => v.familieLabel);
+  const kernAantal = alles.filter((v) => KERNROLLEN.includes(v.familie)).length;
+  if (kernAantal) {
+    families.unshift(["_kernrollen", "kernrollen: analist, controller, finance, risk", kernAantal]);
+  }
+  vulKeuze("filterFamilie", families, "alle functies");
   vulKeuze("filterBron", tel((v) => v.bron, (v) => bronInfo(v.bron).label), "alle bronnen");
   vulKeuze("filterLocatie", tel((v) => plaatsSleutel(v.locatie), (v) => plaatsLabel(v.locatie)), "alle locaties");
 
@@ -456,6 +495,17 @@ function vulKeuzelijsten() {
   const opties = Array.from(perV, ([n, aantal]) => [n, n, aantal]).sort((a, b) => b[2] - a[2]);
   if (metKern) opties.unshift(["_kern", "twee of meer datasignalen", metKern]);
   vulKeuze("filterVaardigheid", opties, "alle vaardigheden");
+
+  const tel1 = (test) => alles.filter(test).length;
+  const datums = [
+    ["vandaag", "vandaag", tel1((v) => dagenOud(v) === 0)],
+    ["3d", "laatste 3 dagen", tel1((v) => { const d = dagenOud(v); return d !== null && d <= 3; })],
+    ["week", "laatste week", tel1((v) => { const d = dagenOud(v); return d !== null && d <= 7; })],
+    ["ouder", "ouder dan een week", tel1((v) => { const d = dagenOud(v); return d !== null && d > 7; })],
+    ["geen", "zonder datum", tel1((v) => dagenOud(v) === null)],
+  ].filter(([, , n]) => n > 0);
+  vulKeuze("filterDatum", datums, "alle datums");
+  filters.datum = $("filterDatum").value;
   filters.vaardigheid = $("filterVaardigheid").value;
   // De filterstaat volgt de dropdowns, voor het geval een keuze is weggevallen.
   filters.familie = $("filterFamilie").value;
@@ -466,7 +516,7 @@ function vulKeuzelijsten() {
 // De wis-knop verschijnt alleen als er echt iets te wissen valt.
 function markeerFilters() {
   const actiefFilter = !!(filters.familie || filters.bron || filters.locatie ||
-    filters.vaardigheid || filters.vlag || filters.oordeel !== "alles" ||
+    filters.vaardigheid || filters.datum || filters.vlag || filters.oordeel !== "alles" ||
     $("zoek").value.trim());
   $("btnWisFilters").hidden = !actiefFilter;
 }
@@ -626,10 +676,51 @@ function tekenAnalyse() {
     `Vaardigheden komen uit de omschrijving: een vermelding is geen eis, dus lees het als een aanwijzing en niet als een cijfer.`;
 }
 
+// Het infopaneel toont naast de uitleg ook je werkelijke instellingen. Bewust
+// uit de server gelezen en niet in de tekst geschreven: uitleg die je met de hand
+// bijwerkt loopt binnen een week achter op de werkelijkheid.
+async function tekenInfo() {
+  const [p, r] = await Promise.all([
+    fetch("/api/profiel").then((x) => x.json()).catch(() => ({})),
+    fetch("/api/rooster").then((x) => x.json()).catch(() => ({})),
+  ]);
+  const bronnen = [
+    p.boards_actief && `borden (${(p.boards_sites || []).join(", ")})`,
+    p.ats_actief && "ATS-feeds",
+    p.werkenbij_actief && "werkenbij-sites",
+    p.magnetme_actief && "magnet.me",
+  ].filter(Boolean);
+  const tijden = (r.tijden || [])
+    .map(([u, m]) => String(u).padStart(2, "0") + ":" + String(m).padStart(2, "0"))
+    .join(" en ");
+
+  $("infoKpis").innerHTML =
+    kpiTegel((p.zoektermen || []).length, "zoektermen") +
+    kpiTegel(bronnen.length, "bronnen actief") +
+    kpiTegel((p.locaties_toegestaan || []).length, "toegestane locaties") +
+    kpiTegel(p.max_uren_oud ?? "?", "uur terugkijken");
+
+  const rij = (k, v) => `<dt>${esc(k)}</dt><dd>${v || "<i>leeg</i>"}</dd>`;
+  const lijst = (a) => (a || []).map((x) => `<code>${esc(x)}</code>`).join(" ");
+  $("infoDetail").innerHTML =
+    rij("Bronnen", esc(bronnen.join(", "))) +
+    rij("Zoeklocaties", lijst(p.boards_locaties)) +
+    rij("Toegestane locaties", lijst(p.locaties_toegestaan)) +
+    rij("Titel-uitsluitingen", lijst(p.titel_uitsluiten)) +
+    rij("Bedrijf-uitsluitingen", lijst(p.bedrijf_uitsluiten)) +
+    rij("Flags", lijst(p.flag_termen)) +
+    rij("Automatische run", r.beschikbaar
+        ? (r.aan ? `staat aan, draait om ${esc(tijden)}` : "staat uit")
+        : "niet geinstalleerd") +
+    rij("Resultaten per zoekterm", p.resultaten_per_term);
+}
+
 function kiesWeergave(w) {
   weergave = w;
   $("weergaveLijst").hidden = w !== "lijst";
   $("weergaveAnalyse").hidden = w !== "analyse";
+  $("weergaveInfo").hidden = w !== "info";
+  if (w === "info") tekenInfo();
   document.querySelectorAll(".weergavekeuze .segknop").forEach((b) => {
     const aan = b.dataset.w === w;
     b.classList.toggle("aan", aan);
@@ -1079,7 +1170,7 @@ function toggleProfiel() {
 $("zoek").addEventListener("input", teken);
 $("reset").onclick = () => { filters.bron = ""; $("filterBron").value = ""; teken(); };
 [["filterFamilie", "familie"], ["filterBron", "bron"], ["filterLocatie", "locatie"],
- ["filterVaardigheid", "vaardigheid"], ["filterOordeel", "oordeel"],
+ ["filterDatum", "datum"], ["filterVaardigheid", "vaardigheid"], ["filterOordeel", "oordeel"],
  ["filterVlag", "vlag"], ["sorteer", "sorteer"]]
   .forEach(([id, sleutel]) => {
     $(id).addEventListener("change", (e) => {
@@ -1088,10 +1179,25 @@ $("reset").onclick = () => { filters.bron = ""; $("filterBron").value = ""; teke
       tekenDetail();
     });
   });
+// Een klik naar de scherpe trechter: kernrollen plus twee of meer datasignalen.
+// Bewust een knop en geen standaardstand: een filter dat bij het openen al
+// negen tiende verbergt is een filter dat je vergeet, en dan mis je dingen
+// zonder het te merken. Zo zie je wat je doet en zet je het net zo makkelijk uit.
+$("btnScherp").onclick = () => {
+  const naarScherp = !(filters.familie === "_kernrollen" && filters.vaardigheid === "_kern");
+  filters.familie = naarScherp ? "_kernrollen" : "";
+  filters.vaardigheid = naarScherp ? "_kern" : "";
+  $("filterFamilie").value = filters.familie;
+  $("filterVaardigheid").value = filters.vaardigheid;
+  $("btnScherp").classList.toggle("aan", naarScherp);
+  teken();
+  tekenDetail();
+};
 $("btnWisFilters").onclick = () => {
-  Object.assign(filters, { familie: "", bron: "", locatie: "", vaardigheid: "", oordeel: "alles", vlag: "" });
+  $("btnScherp").classList.remove("aan");
+  Object.assign(filters, { familie: "", bron: "", locatie: "", datum: "", vaardigheid: "", oordeel: "alles", vlag: "" });
   $("zoek").value = "";
-  ["filterFamilie", "filterBron", "filterLocatie", "filterVaardigheid", "filterVlag"]
+  ["filterFamilie", "filterBron", "filterLocatie", "filterDatum", "filterVaardigheid", "filterVlag"]
     .forEach((id) => ($(id).value = ""));
   $("filterOordeel").value = "alles";
   teken();

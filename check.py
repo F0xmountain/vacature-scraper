@@ -24,9 +24,12 @@ def kop(tekst):
 
 def check_python():
     kop("Python")
-    ok = sys.version_info >= (3, 10)
+    # 3.11 of 3.12, niet nieuwer: python-jobspy pint numpy 1.26.3 en daar bestaat
+    # geen wheel voor 3.13 en hoger. Eerder stond hier alleen een ondergrens van
+    # 3.10, waardoor de zelftest versies goedkeurde waarop de installatie stukloopt.
+    ok = (3, 11) <= sys.version_info[:2] <= (3, 12)
     v = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    print(f"{'OK  ' if ok else 'FOUT'} Python {v}" + ("" if ok else "  (3.10 of hoger nodig)"))
+    print(f"{'OK  ' if ok else 'FOUT'} Python {v}" + ("" if ok else "  (3.11 of 3.12 nodig)"))
     return ok
 
 
@@ -178,7 +181,8 @@ def check_filter(cfg, jobs):
     uniek = dedupe(jobs)
     kept, stats = apply_filters(uniek, cfg)
     print(f"Opgehaald: {len(jobs)}  |  na ontdubbelen: {len(uniek)}")
-    print(f"Gedropt op titel: {stats['titel']}  |  gedropt op locatie: {stats['locatie']}")
+    print(f"Gedropt op titel: {stats['titel']}  |  op bedrijf: {stats.get('bedrijf', 0)}"
+          f"  |  op locatie: {stats['locatie']}")
     print(f"Blijft over: {len(kept)}")
     if kept:
         print("\nVoorbeelden van wat er doorheen komt:")
@@ -194,7 +198,15 @@ def main():
         return
 
     import yaml
-    cfg = yaml.safe_load((HIER / "config.yaml").read_text(encoding="utf-8"))
+    pad = HIER / "config.yaml"
+    if not pad.exists():
+        # config.yaml staat in .gitignore, dus een verse kloon heeft hem niet.
+        # Zonder deze check kreeg je hier een traceback in plaats van uitleg.
+        print("\nFOUT config.yaml ontbreekt.")
+        print("     Dit is je persoonlijke zoekprofiel en staat daarom niet in git.")
+        print("     Maak hem aan met:  cp config.example.yaml config.yaml")
+        return
+    cfg = yaml.safe_load(pad.read_text(encoding="utf-8"))
 
     jobs = []
     jobs += check_boards(cfg)

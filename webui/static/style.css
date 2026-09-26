@@ -473,3 +473,25 @@ button{font:inherit;color:inherit}
   margin:26px 0 0;font-size:12px;color:var(--muted);
   border-top:1px solid var(--line-zacht);padding-top:12px;max-width:70ch;
 }
+.knop.scherp{font-family:var(--mono);font-size:11px;padding:5px 11px}
+.knop.scherp.aan{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ---------- infopaneel ---------- */
+.info-binnen{max-width:72ch}
+.info h2{font-family:var(--cond);font-size:21px;font-weight:700;margin:0 0 8px}
+.info h3{font-family:var(--cond);font-size:15px;font-weight:700;margin:0 0 8px}
+.info-lead{margin:0 0 26px;color:var(--muted)}
+.info-blok{margin-bottom:28px}
+.info-blok p{margin:0 0 10px}
+.info-lijst{margin:0;display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr);gap:8px 16px}
+.info-lijst dt{font-weight:600;font-size:13px}
+.info-lijst dd{margin:0;font-size:13px;color:var(--muted)}
+.info-lijst code{
+  font-family:var(--mono);font-size:11px;background:var(--surface-2);
+  border:1px solid var(--line-zacht);border-radius:3px;padding:1px 5px;
+  display:inline-block;margin:1px 0;
+}
+.info-klein{font-size:12px;color:var(--muted);margin-top:12px !important;
+  border-left:2px solid var(--line);padding-left:11px}
+.info .kpi-rij{margin:4px 0 18px}
+@media (max-width:640px){.info-lijst{grid-template-columns:1fr;gap:2px 0}}

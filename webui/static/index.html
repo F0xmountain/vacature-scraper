@@ -16,6 +16,7 @@
     <div class="weergavekeuze" role="group" aria-label="Weergave">
       <button type="button" class="segknop aan" data-w="lijst" aria-pressed="true">Lijst</button>
       <button type="button" class="segknop" data-w="analyse" aria-pressed="false">Analyse</button>
+      <button type="button" class="segknop" data-w="info" aria-pressed="false">Info</button>
     </div>
     <button class="knop" id="btnProfiel">Zoekprofiel</button>
     <button class="knop" id="btnToon">Zoek en toon</button>
@@ -122,6 +123,7 @@
     <select class="keuze" id="filterFamilie" aria-label="Filter op functie"></select>
     <select class="keuze" id="filterBron" aria-label="Filter op bron"></select>
     <select class="keuze" id="filterLocatie" aria-label="Filter op locatie"></select>
+    <select class="keuze" id="filterDatum" aria-label="Filter op plaatsingsdatum"></select>
     <select class="keuze" id="filterVaardigheid" aria-label="Filter op vaardigheid"></select>
     <select class="keuze" id="filterOordeel" aria-label="Filter op oordeel">
       <option value="alles">alle oordelen</option>
@@ -139,6 +141,7 @@
       <option value="oud">oudste eerst</option>
       <option value="bron">bronvolgorde</option>
     </select>
+    <button class="knop scherp" type="button" id="btnScherp" title="Kernrollen plus twee of meer datasignalen">Scherpe trechter</button>
     <button class="knop wis" type="button" id="btnWisFilters" hidden>filters wissen</button>
     <button class="knop" id="btnLaatste" title="Toon de laatst weggeschreven automatische run">Laatste run</button>
     <button class="knop" id="btnExport">Exporteer ja-lijst</button>
@@ -150,6 +153,73 @@
     <section class="lijst" id="lijst" role="listbox" aria-label="Gevonden vacatures"></section>
     <aside class="detail" id="detail"></aside>
   </main>
+
+  <section class="analyse info" id="weergaveInfo" aria-label="Info" hidden>
+    <div class="info-binnen">
+      <h2>Hoe deze monitor werkt</h2>
+      <p class="info-lead">Vier bronnen worden doorzocht, het resultaat gaat door een
+        poort die alleen harde uitsluitingen dropt, en wat overblijft beoordeel jij.
+        De tool versmalt de trechter; hij beslist niet.</p>
+
+      <section class="info-blok">
+        <h3>1. Ophalen</h3>
+        <p>Elke bron faalt apart en zichtbaar: valt er een om, dan wordt dat gemeld
+          en draait de rest door.</p>
+        <dl class="info-lijst">
+          <dt>Vacatureborden</dt><dd>LinkedIn en Indeed via python-jobspy, op publieke gast-endpoints. Elke zoekterm wordt per zoeklocatie apart bevraagd.</dd>
+          <dt>ATS-feeds</dt><dd>Publieke careers-API's van bedrijven die je zelf opgeeft: Recruitee, Greenhouse, Lever en Workday.</dd>
+          <dt>Werkenbij-sites</dt><dd>Servergerenderde overzichtspagina's, met per site een linkpatroon. DNB, Banken.nl en Consultancy.nl.</dd>
+          <dt>Magnet.me</dt><dd>De publieke overzichtspagina's per stad en functiecategorie.</dd>
+        </dl>
+        <p class="info-klein">Geen login, nergens. Alles draait op uitgelogde publieke
+          endpoints, zodat je eigen accounts erbuiten blijven.</p>
+      </section>
+
+      <section class="info-blok">
+        <h3>2. De poort: wat er wel en niet uit valt</h3>
+        <p>Er zijn twee soorten regels, en het verschil is wezenlijk.</p>
+        <dl class="info-lijst">
+          <dt>Droppen</dt><dd><b>Titel- en bedrijfsuitsluitingen</b> werken op woordgrens en zijn bot met opzet: <code>manager</code> dropt "Risk Manager" maar niet "Risk Management Analyst". Het <b>locatiefilter</b> dropt wat buiten je toegestane plaatsen valt; een lege locatie wordt niet gedropt maar geflagd.</dd>
+          <dt>Markeren</dt><dd><b>Flags</b> droppen nooit. Een compliance-touchpoint diskwalificeert niet en een compliance-kern wel, en dat verschil is niet machinaal vast te stellen. Daarom een vlag en geen oordeel.</dd>
+        </dl>
+        <p class="info-klein">Er zit bewust geen automatische scoring in die vacatures
+          afwijst. Hybride dagen, salaris en de vraag of de analytische kern echt is
+          staan zelden betrouwbaar in een listing.</p>
+      </section>
+
+      <section class="info-blok">
+        <h3>3. Zeven in de interface</h3>
+        <p>Deze filters <b>verbergen</b> alleen. Je zet ze terug en alles staat er weer,
+          anders dan de uitsluitingen hierboven.</p>
+        <dl class="info-lijst">
+          <dt>Functiefamilie</dt><dd>De titel wordt met trefwoorden in twaalf families ingedeeld. De eerste die raakt wint, dus "Credit Risk Analyst" is een analist en geen risk-rol. Ongeveer driekwart valt in een familie; de rest heet Overig.</dd>
+          <dt>Vaardigheden</dt><dd>Uit de omschrijving gehaald: gereedschap, methoden, diploma's en taal.</dd>
+          <dt>Datasignalen</dt><dd>Hoeveel van die vaardigheden op echt data-werk wijzen. Excel telt niet mee, want dat noemt elke kantoorvacature, en taal ook niet.</dd>
+          <dt>Scherpe trechter</dt><dd>Zet in een klik twee filters tegelijk: functie op de kernrollen (analist, controller, finance, risk) en vaardigheid op twee of meer datasignalen. Nog een klik en hij staat uit.</dd>
+        </dl>
+        <p class="info-klein">Een vermelding is geen eis. "Wij werken met Python" in een
+          bedrijfsprofiel telt hier net zo zwaar als een harde eis, en dat verschil is
+          niet betrouwbaar vast te stellen. Lees het als een aanwijzing.</p>
+      </section>
+
+      <section class="info-blok">
+        <h3>4. Nieuwheid en de automatische run</h3>
+        <p><b>Zoek en toon</b> is een dry-run: schrijft niets weg, raakt het geheugen niet
+          aan, dus zo vaak als je wilt. <b>Zoek en onthoud</b> is een echte run die de xlsx
+          wegschrijft en nieuwheid verbruikt; wat eenmaal is vastgelegd meldt de tool
+          daarna niet meer als nieuw.</p>
+        <p>De automatische run doet hetzelfde als die tweede knop. Wat hij vindt komt in
+          <code>output/</code> als xlsx, en de laatste zes runs blijven leesbaar in de
+          interface via <b>Laatste run</b>, inclusief de volledige tekst.</p>
+      </section>
+
+      <section class="info-blok">
+        <h3>Je huidige instellingen</h3>
+        <div class="kpi-rij" id="infoKpis"></div>
+        <dl class="info-lijst" id="infoDetail"></dl>
+      </section>
+    </div>
+  </section>
 
   <section class="analyse" id="weergaveAnalyse" aria-label="Analyse" hidden>
     <div class="kpi-rij" id="kpis"></div>

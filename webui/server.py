@@ -95,6 +95,9 @@ def _lees_profiel():
         "boards_locaties": list(zoeklocaties),
         "locaties_toegestaan": list(cfg.get("locaties_toegestaan") or []),
         "titel_uitsluiten": list(cfg.get("titel_uitsluiten") or []),
+        # Alleen om te tonen in het infopaneel. Bewerken kan hier niet: de
+        # schrijfroute loopt via config_io.py en dat kent dit veld nog niet.
+        "bedrijf_uitsluiten": list(cfg.get("bedrijf_uitsluiten") or []),
         "flag_termen": list(cfg.get("flag_termen") or []),
         "boards_actief": bool(boards.get("actief", True)),
         "boards_sites": list(boards.get("sites") or ["linkedin", "indeed"]),
