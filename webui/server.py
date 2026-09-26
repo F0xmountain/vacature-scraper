@@ -414,6 +414,33 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"fout": str(e)}, 500)
             return
 
+        if self.path == "/api/laatste/wis":
+            # Verwijdert het bewaarde runvenster. De xlsx-bestanden in output/ en
+            # beoordeling.json blijven staan; die hebben hun eigen route.
+            #
+            # Hoort eigenlijk in output.py, dat de enige schrijfroute naar dit
+            # bestand is. Dat bestand staat op de deny-lijst, dus het staat hier,
+            # bewust als kale unlink en zonder schrijflogica. De functie om het
+            # daarheen te verhuizen staat in de projectdocumentatie.
+            try:
+                cfg = scraper.laad_config()
+                pad = (
+                    Path(output.__file__).with_name(cfg.get("output_map") or "output")
+                    / "laatste_run.json"
+                )
+                bestond = pad.exists()
+                pad.unlink(missing_ok=True)
+                # Ook het resultaat in het geheugen van deze server, anders staat de
+                # lijst na een pagina-vernieuwing gewoon weer vol.
+                global _run_state
+                with _run_lock:
+                    if _run_state["status"] != "bezig":
+                        _run_state = {"status": "idle", "resultaat": None, "fout": None}
+                self._json({"ok": True, "bestond": bestond})
+            except Exception as e:
+                self._json({"fout": str(e)}, 500)
+            return
+
         if self.path == "/api/oordelen/wis":
             # Meerdere oordelen in een keer wissen (de 'alles wissen'-knop). Gaat via
             # dezelfde schrijfroute in oordeel.py.

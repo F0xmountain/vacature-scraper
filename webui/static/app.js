@@ -933,6 +933,36 @@ function csvVeld(waarde) {
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
+
+// De bewaarde runs weggooien. Bewust met bevestiging en met de gevolgen erin: de
+// volledige functieteksten zitten alleen in dit bestand en zijn daarna weg. De
+// xlsx-bestanden blijven staan, maar die hebben de tekst niet.
+async function wisBewaardeRuns() {
+  const n = alles.length;
+  if (!confirm(
+    `${n} geladen vacatures wissen?\n\n` +
+    "Dit verwijdert de bewaarde runs met hun volledige functieteksten. " +
+    "Dat is onomkeerbaar; de teksten staan nergens anders.\n\n" +
+    "Blijven wel staan: de xlsx-bestanden in output/ (zonder tekst) en al je " +
+    "ja/nee-oordelen.\n\n" +
+    "De lijst vult zich weer bij de volgende automatische run."
+  )) return;
+
+  zetStatus("klaar", "wissen...");
+  try {
+    const res = await fetch("/api/laatste/wis", { method: "POST" });
+    const r = await res.json();
+    if (!res.ok || r.fout) {
+      zetStatus("klaar", "wissen mislukt: " + (r.fout || res.status));
+      return;
+    }
+    vul([]);
+    zetStatus("klaar", "gewist; de lijst vult zich bij de volgende run");
+  } catch (e) {
+    zetStatus("klaar", "wissen mislukt: " + e);
+  }
+}
+
 // Alle oordelen (ja en nee) van de geladen vacatures terug op onbeoordeeld. Met
 // bevestiging, want het is niet terug te draaien. Persisteert in een verzoek via
 // de enige schrijfroute (oordeel.py); de lokale staat gaat meteen mee.
@@ -1205,6 +1235,7 @@ $("btnWisFilters").onclick = () => {
 $("btnLaatste").onclick = laadBewaardeRun;
 $("btnExport").onclick = exporteerJa;
 $("btnWisAlle").onclick = wisAlleOordelen;
+$("btnWisRuns").onclick = wisBewaardeRuns;
 $("btnToon").onclick = () => startRun(false);
 $("btnOnthoud").onclick = () => {
   // Een echte run verbruikt nieuwheid en dat is onomkeerbaar: eerst bevestigen.
