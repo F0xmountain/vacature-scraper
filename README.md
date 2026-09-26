@@ -179,6 +179,28 @@ Een vermelding is geen eis. "Wij werken met Python" in een bedrijfsprofiel telt
 hier net zo zwaar als een harde eis, en dat verschil is niet machinaal vast te
 stellen. Lees het als aanwijzing, niet als cijfer.
 
+### Wis vacatures
+
+Verwijdert `output/laatste_run.json`, het venster met de bewaarde runs en hun
+volledige functieteksten. Onomkeerbaar: die teksten staan nergens anders. De
+xlsx-bestanden en je ja/nee-oordelen blijven staan.
+
+De verwijdering staat nu in `webui/server.py`, terwijl de exportmodule de enige
+schrijfroute naar dat bestand hoort te zijn. Wil je dat rechtzetten, zet dan deze
+functie daarin en laat de server hem aanroepen:
+
+```python
+def wis_laatste_run(cfg):
+    """Verwijder het bewaarde runvenster. Geeft terug of er iets stond."""
+    pad = (
+        Path(__file__).with_name(cfg.get("output_map") or "output")
+        / "laatste_run.json"
+    )
+    bestond = pad.exists()
+    pad.unlink(missing_ok=True)
+    return bestond
+```
+
 ### Analyse
 
 Een KPI-rij en vijf staafgrafieken over wat er na je filters overblijft: per
