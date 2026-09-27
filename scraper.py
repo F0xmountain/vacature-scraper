@@ -165,6 +165,7 @@ def main():
     print(f"\nOpgehaald: {opgehaald} vacatures")
     print(
         f"Na ontdubbelen: {stats['totaal']} | gedropt op titel: {stats['titel']}"
+        f" | gedropt op bedrijf: {stats['bedrijf']}"
         f" | gedropt op locatie: {stats['locatie']} | over: {len(kept)}"
     )
 

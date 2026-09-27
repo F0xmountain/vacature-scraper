@@ -58,12 +58,18 @@ def schrijf_profiel(cfg, profiel):
     """Schrijf een profiel-dict naar config.yaml via zet_lijst en bewaar.
 
     Dit is de ene schrijfroute die zowel config_ui.py als de webserver gebruiken.
-    De velden en de volgorde zijn gelijk aan de oude opslaglogica in config_ui.py,
-    zodat de comments in config.yaml behouden blijven.
+    De volgorde volgt de oude opslaglogica in config_ui.py, zodat de comments in
+    config.yaml behouden blijven. Velden die de aanroeper niet meestuurt worden
+    niet aangeraakt; de twee interfaces kennen niet allebei dezelfde velden.
     """
     boards = cfg.setdefault("boards", {})
     zet_lijst(cfg, "zoektermen", profiel["zoektermen"])
     zet_lijst(cfg, "titel_uitsluiten", profiel["titel_uitsluiten"])
+    # Alleen schrijven als de aanroeper het veld kent. config_ui.py stuurt het
+    # niet mee, en zonder deze controle zou een keer opslaan daar de
+    # bedrijf-uitsluitingen wissen zonder dat iemand erom vroeg.
+    if "bedrijf_uitsluiten" in profiel:
+        zet_lijst(cfg, "bedrijf_uitsluiten", profiel["bedrijf_uitsluiten"])
     zet_lijst(cfg, "locaties_toegestaan", profiel["locaties_toegestaan"])
     zet_lijst(cfg, "flag_termen", profiel["flag_termen"])
     boards["actief"] = profiel["boards_actief"]
