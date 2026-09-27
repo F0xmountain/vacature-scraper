@@ -12,6 +12,9 @@ Vacature Scraper.app/
 
 # Persoonlijk: je eigen zoekprofiel. Kopieer config.example.yaml naar config.yaml.
 config.yaml
+# Je cv, als je het dossier voor Claude het automatisch wil laten meenemen
+cv.md
+cv.txt
 # Lokale Claude Code-instellingen (settings.json is wel gedeeld)
 .claude/settings.local.json
 # Bevat absolute paden naar deze machine; launchd/README.md legt uit hoe je hem maakt

@@ -158,6 +158,9 @@ def main():
     test_linkedin_datum()
     test_rooster_tijden()
     test_werkenbij_opties()
+    test_dossier_knip()
+    test_dossier_budget()
+    test_dossier_bouw()
 
     print(f"Alle checks OK. Testbestand: {pad.name}")
 
@@ -289,6 +292,99 @@ def test_werkenbij_opties():
     # Zonder json_veld blijft het pad ongewijzigd: gewone HTML uit de body.
     zonder = {k: v for k, v in site.items() if k != "json_veld"}
     assert _html_uit(NepRespons(), zonder) == NepRespons.text
+
+
+def test_dossier_knip():
+    """Slim afkappen: het eisenblok gaat mee, ook als het achterin staat."""
+    import dossier
+
+    intro = "Wij zijn een groot bedrijf. " * 40          # 1080 tekens bedrijfsproza
+    eisen = "Requirements\nSQL en Python.\nDrie jaar ervaring."
+    tekst = intro + "\n" + eisen
+
+    heel = dossier.kort(tekst, 5000)
+    assert heel.endswith("ervaring."), "een tekst die past mag niet veranderen"
+
+    kort = dossier.kort(tekst, 600)
+    assert "Requirements" in kort, "eisenblok weggevallen bij afkappen"
+    assert "SQL en Python." in kort, "eisen zelf weggevallen"
+    assert "tussenstuk weggelaten" in kort, "knip niet gemarkeerd"
+    assert kort.startswith("Wij zijn een groot bedrijf."), "kop van de tekst weg"
+    assert len(kort) <= 600 + len(" [...]"), f"limiet overschreden: {len(kort)}"
+
+    # Is het eisenblok korter dan zijn deel van de ruimte, dan gaat wat
+    # overblijft naar de kop. Zonder die stap bleef een derde van de toegemeten
+    # ruimte leeg terwijl er tekst genoeg was.
+    kort_blok = dossier.kort(intro + "\nRequirements\nSQL.", 600)
+    assert len(kort_blok) > 520, f"ruimte blijft onbenut: {len(kort_blok)}"
+    assert kort_blok.rstrip().endswith("SQL."), "eisenblok weggevallen bij herverdelen"
+
+    # Een gewone zin met het woord requirements erin is geen eisenkop. Met een
+    # ruimer zoekvenster sloeg dat wel aan, en dan begint het tweede stuk van de
+    # tekst midden in een alinea in plaats van bij de eisen.
+    zin = ("We helpen klanten die complexe risk, compliance and audit "
+           "requirements willen omzetten in helder advies.")
+    geen_kop = dossier.kort(intro + "\n" + zin + "\n" + "Nog wat proza. " * 30, 600)
+    assert "tussenstuk weggelaten" not in geen_kop, "zin met 'requirements' wordt als kop gelezen"
+
+    # Zonder eisenkop gewoon aan het eind knippen, met een teken dat er meer was.
+    plat = dossier.kort("Een lange lap tekst zonder kop. " * 40, 300)
+    assert plat.endswith("[...]"), "afkapping niet gemarkeerd"
+    assert len(plat) <= 300 + len(" [...]"), f"limiet overschreden: {len(plat)}"
+
+    # Witruimte: alinea's blijven, drie lege regels worden er een.
+    assert dossier._plat("a\n\n\n\nb   c") == "a\n\nb c", "witruimte-opruiming faalt"
+
+    # Koppen uit de brontekst moeten hun hekjes kwijt: het dossier is zelf
+    # markdown en zet elke vacature onder een kop met drie hekjes. Een hashtag
+    # is geen kop en blijft staan. Ontsnappingen uit de bron gaan eruit,
+    # sterretjes blijven, want die dragen nadruk in een markdown-bestand.
+    schoon = dossier._plat("### **Description**\n#Jobster\n25\\-Sep en Dolce \\& Gabbana")
+    assert schoon == "**Description**\n#Jobster\n25-Sep en Dolce & Gabbana", schoon
+
+
+def test_dossier_budget():
+    """Meer vacatures is minder tekst per stuk, tussen de twee grenzen."""
+    import dossier
+
+    assert dossier.per_vacature(10, 100_000) == dossier.PER_MAX, "bovengrens telt niet"
+    assert dossier.per_vacature(100, 100_000) == 1000, "budget wordt niet verdeeld"
+    assert dossier.per_vacature(10_000, 100_000) == dossier.PER_MIN, "ondergrens telt niet"
+    assert dossier.per_vacature(0) == dossier.PER_MAX, "leeg mag niet delen door nul"
+
+
+def test_dossier_bouw():
+    """Het dossier bevat de opdracht, de velden en een waarschuwing als het moet."""
+    import dossier
+
+    jobs = [{
+        "functie": "Junior Risk Analyst", "bedrijf": "Proefbank",
+        "locatie": "Amsterdam", "geplaatst": "2026-09-26", "bron": "linkedin",
+        "salaris": "", "flags": "compliance", "url": "https://example.invalid/1",
+        "beschrijving": "Wij zoeken een analist.\nRequirements\nSQL en Python.",
+    }]
+    tekst, meta = dossier.bouw(jobs, {"zoektermen": ["risk analyst"]}, cv="Mijn cv hier.")
+    assert meta == {"aantal": 1, "per_vacature": dossier.PER_MAX, "geknipt": 0,
+                    "tekens": len(tekst), "te_groot": False}, f"meta faalt: {meta}"
+    assert "## Opdracht" in tekst and "Uitzoeken" in tekst, "opdracht ontbreekt"
+    assert "Mijn cv hier." in tekst, "cv niet opgenomen"
+    assert "Gezocht op: risk analyst" in tekst, "zoekprofiel ontbreekt"
+    for stuk in ("Proefbank", "Amsterdam", "2026-09-26", "linkedin",
+                 "Salaris: niet vermeld", "Vlaggen: compliance",
+                 "https://example.invalid/1", "SQL, Python"):
+        assert stuk in tekst, f"ontbreekt in het dossier: {stuk}"
+
+    # Zonder cv een aanwijzing in plaats van een leeg kopje.
+    zonder, _ = dossier.bouw(jobs)
+    assert "als bijlage" in zonder, "geen aanwijzing bij een ontbrekend cv"
+
+    # Te veel vacatures: de ondergrens wint van het budget en dat moet erbij staan.
+    veel, meta_veel = dossier.bouw(jobs * 500, budget=100_000)
+    assert meta_veel["te_groot"], "te_groot niet gezet"
+    assert "Dit dossier is groot" in veel, "waarschuwing ontbreekt in het bestand"
+
+    leeg, meta_leeg = dossier.bouw([])
+    assert meta_leeg["aantal"] == 0 and "Geen vacatures geselecteerd" in leeg, "leeg faalt"
 
 
 if __name__ == "__main__":

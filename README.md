@@ -179,6 +179,56 @@ Een vermelding is geen eis. "Wij werken met Python" in een bedrijfsprofiel telt
 hier net zo zwaar als een harde eis, en dat verschil is niet machinaal vast te
 stellen. Lees het als aanwijzing, niet als cijfer.
 
+### Dossier voor Claude
+
+De knop **Dossier voor Claude** maakt een markdown-bestand van precies de
+vacatures die je op dat moment gefilterd ziet, in die volgorde, met de
+functietekst erbij en een opdracht erboven. Geef dat bestand samen met je cv aan
+Claude en je krijgt een rangschikking terug: per vacature het raakvlak met je cv,
+wat er ontbreekt, waarmee je zou openen, en wat je nog moet uitzoeken omdat het
+niet in de tekst staat.
+
+Bedoeld om na de scherpe trechter te gebruiken, niet op het hele venster. Dat is
+geen stijlvoorkeur maar een rekensom: het venster van drie dagen telt miljoenen
+tekens, en dat past in geen enkel gesprek.
+
+`dossier.py` verdeelt daarom een tekenbudget (standaard 320.000, grofweg
+tachtigduizend tokens) over de geselecteerde vacatures. Hoe scherper je filtert,
+hoe meer tekst er per vacature overblijft:
+
+Gemeten op het venster van 27-09-2026 (1212 vacatures):
+
+| Selectie | Per vacature | Dossier |
+|---|---|---|
+| 12 vacatures | 6.000 tekens (het maximum) | ~16k tokens |
+| 60, de scherpe trechter | 5.333 tekens | ~70k tokens |
+| 1212, het hele venster | 800 tekens (het minimum) | ~320k tokens, past niet |
+
+De middelste regel is waar dit voor bedoeld is.
+
+Moet er ingekort worden, dan gaat het eisenblok mee en niet alleen de
+bedrijfsintroductie. Van de teksten in het venster van 27-09-2026 heeft 51 procent
+een vindbare eisenkop ("Requirements", "Wat wij vragen", "Jouw profiel" en
+verwanten), met de mediaan op 52 procent van de tekst. Plat afkappen op de kop
+gooit dus precies het stuk weg waar het om gaat. Waar geknipt is staat `[...]`,
+zodat er geen conclusie wordt getrokken uit tekst die er niet meer staat.
+
+Je cv kan er automatisch in: zet hem als `cv.md` of `cv.txt` in de projectmap en
+het dossier neemt hem over. Beide staan in `.gitignore`. Een pdf kun je beter los
+aan Claude meegeven; daar hoeft dan geen pdf-lezer bij.
+
+Ook zonder de interface te openen:
+
+```
+./.venv/bin/python dossier.py --scherp          # de scherpe trechter, net als de knop
+./.venv/bin/python dossier.py --max 40          # de nieuwste veertig
+./.venv/bin/python dossier.py --cv ~/cv.md      # ander pad naar je cv
+./.venv/bin/python dossier.py --budget 500000   # ruimer budget, langere teksten
+```
+
+Het bestand komt in `output/matchdossier.md`. De knop in de interface schrijft
+niets weg; die stuurt het bestand rechtstreeks naar je downloads.
+
 ### Wis vacatures
 
 Verwijdert `output/laatste_run.json`, het venster met de bewaarde runs en hun

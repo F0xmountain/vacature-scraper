@@ -934,6 +934,78 @@ function csvVeld(waarde) {
 }
 
 
+// Boven dit aantal wordt het dossier te groot voor een gesprek waar ook nog een
+// antwoord bij moet. Geen harde grens: de server kort de teksten dan verder in
+// en zegt dat in het bestand. Dit is alleen het moment om te vragen of je niet
+// liever eerst filtert.
+const DOSSIER_RUIM = 200;
+
+// Het matchdossier: precies wat je nu gefilterd ziet, in de volgorde waarin je
+// het ziet. De opmaak en het tekstbudget zitten in dossier.py; hier gaan alleen
+// de sleutels heen en komt een bestand terug. De volledige functieteksten staan
+// op de server, niet in deze pagina, dus dit kan niet in de browser.
+async function maakDossier() {
+  const rijen = zichtbaar();
+  if (!rijen.length) {
+    zetStatus("klaar", "geen vacatures in beeld om een dossier van te maken");
+    return;
+  }
+  if (rijen.length > DOSSIER_RUIM && !confirm(
+    `${rijen.length} vacatures in het dossier.\n\n` +
+    "Dat is te veel voor een gesprek: per vacature blijft er dan zo weinig tekst " +
+    "over dat er weinig te matchen valt. Filter eerst scherper, bijvoorbeeld met " +
+    "de scherpe trechter of een datumfilter.\n\nToch doorgaan?"
+  )) return;
+
+  const knop = $("btnDossier");
+  if (knop) knop.disabled = true;
+  zetStatus("klaar", "dossier maken...");
+  try {
+    const res = await fetch("/api/dossier", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sleutels: rijen.map((v) => v.sleutel) }),
+    });
+    if (!res.ok) {
+      let melding = res.status;
+      try { melding = (await res.json()).fout || melding; } catch (e) { /* geen JSON */ }
+      zetStatus("klaar", "dossier mislukt: " + melding);
+      return;
+    }
+    const meta = JSON.parse(res.headers.get("X-Dossier") || "{}");
+    const naam = (res.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = naam ? naam[1] : "matchdossier.md";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    zetStatus("klaar", dossierMelding(meta, rijen.length));
+  } catch (e) {
+    zetStatus("klaar", "dossier mislukt: " + e);
+  } finally {
+    if (knop) knop.disabled = false;
+  }
+}
+
+function dossierMelding(meta, gevraagd) {
+  const n = meta.aantal ?? gevraagd;
+  const tokens = Math.round((meta.tekens || 0) / 4000);
+  const delen = [`dossier met ${n} vacatures, ruwweg ${tokens}k tokens`];
+  // Ontbreken er vacatures, dan staat de tekst niet op de server. Dat gebeurt bij
+  // een oude sessie waarvan het runvenster al is doorgeschoven.
+  if (meta.gevraagd && meta.gevonden && meta.gevonden < meta.gevraagd) {
+    delen.push(`${meta.gevraagd - meta.gevonden} zonder bewaarde tekst overgeslagen`);
+  }
+  if (meta.geknipt) delen.push(`${meta.geknipt} teksten ingekort`);
+  if (meta.te_groot) delen.push("te groot voor een gesprek; filter scherper");
+  return delen.join("; ");
+}
+
+
 // De bewaarde runs weggooien. Bewust met bevestiging en met de gevolgen erin: de
 // volledige functieteksten zitten alleen in dit bestand en zijn daarna weg. De
 // xlsx-bestanden blijven staan, maar die hebben de tekst niet.

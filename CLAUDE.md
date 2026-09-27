@@ -87,6 +87,18 @@ komen vaker terloops voor in relevante vacatures dan als kenmerk in ruis. "zorg"
 stond in 162 ruisvacatures maar ook in 489 relevante, "retail" in 26 tegen 62.
 Uitsluiten gaat op titel en werkgever, niet op tekst.
 
+**Een dossier van het hele venster past niet in een gesprek.** Het venster van
+drie dagen telt miljoenen tekens; op 27-09-2026 kwam het hele venster uit op een
+dossier van 320.000 tokens, en dat past nergens in. `dossier.py` verdeelt
+daarom een tekenbudget over de selectie, met een ondergrens van 800 tekens per
+vacature; wordt die ondergrens bereikt, dan staat er een waarschuwing in het
+bestand in plaats van dat er stil vacatures wegvallen. Moet er ingekort worden,
+dan gaat het eisenblok mee: 51 procent van de teksten heeft een vindbare eisenkop
+en de mediaan staat op 52 procent van de tekst, dus plat afkappen op de kop
+verwijdert juist de eisen. Het venster waarin die kop gezocht wordt is krap
+(40 tekens ervoor, 15 erna) omdat een kop kort is; ruimer maken laat de regex
+aanslaan op gewone zinnen en dan knipt hij midden in een alinea.
+
 **Bouw geen insluitlijst op titels.** Zo'n lijst faalt stil: functietitels zijn
 niet gestandaardiseerd en je ziet niet wat je weggooit. Dat botst met de regel dat
 overfilteren het probleem is. Zeven in de interface, waar niets verdwijnt.
@@ -99,4 +111,10 @@ De kern staat in de projectmap: `scraper.py`, `filters.py`, `store.py`,
 
 Elke module die naar een bestand schrijft is de enige schrijfroute daarheen:
 `config_io.py` naar config.yaml, `store.py` naar state.json, `webui/oordeel.py`
-naar beoordeling.json, `webui/rooster.py` naar launchd. Bouw er geen tweede.
+naar beoordeling.json, `webui/rooster.py` naar launchd, `dossier.py` naar
+output/matchdossier.md. Bouw er geen tweede.
+
+`dossier.py` maakt het matchdossier voor Claude en bepaalt zelf de opmaak, de
+opdracht en het tekenbudget. De webinterface roept `bouw()` aan en stuurt het
+resultaat als download; die bouwt geen eigen versie van de tekst en filtert niet
+opnieuw, maar stuurt de sleutels van wat de gebruiker ziet.

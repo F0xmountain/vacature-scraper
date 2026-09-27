@@ -48,6 +48,10 @@ import functies
 # alleen, net als flag_termen; er wordt niets mee gedropt of gerangschikt.
 import vaardigheden
 
+# dossier.py maakt het matchdossier: de geselecteerde vacatures plus een opdracht,
+# om samen met je cv aan Claude te geven. De opmaak staat daar, niet hier.
+import dossier
+
 STATIC = Path(__file__).resolve().parent / "static"
 HOST, POORT = "127.0.0.1", 8500
 
@@ -267,6 +271,30 @@ def _status():
         return dict(_run_state)
 
 
+def _bekende_vacatures():
+    """Alles waar deze server de tekst van heeft, op dedupe-sleutel.
+
+    Twee bronnen, in deze volgorde. Eerst het bewaarde runvenster op schijf: dat
+    heeft de volledige omschrijving zoals de scraper hem ophaalde. Daarna het
+    resultaat dat nog in het geheugen staat, van een dry-run die niet is
+    weggeschreven; die teksten zijn wel afgekapt op _BESCHRIJVING_LIMIET, want ze
+    zijn via _rijen naar de browser gegaan. Zonder die tweede bron zou een
+    dossier na "Zoek en toon" leeg blijven, en dat is precies het moment waarop
+    je er een wilt.
+    """
+    uit = {}
+    try:
+        data = output.lees_laatste_run(scraper.laad_config())
+    except Exception:
+        data = None
+    for j in (data or {}).get("jobs") or []:
+        uit.setdefault(store.job_key(j), j)
+    resultaat = _status().get("resultaat") or {}
+    for rij in resultaat.get("rijen") or []:
+        uit.setdefault(rij.get("sleutel"), rij)
+    return uit
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "VacatureWebUI/1.0"
 
@@ -280,6 +308,28 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
             pass  # browser sloot de verbinding; niets aan de hand
+
+    def _download(self, tekst, naam, extra=None):
+        """Tekst als bestand aanbieden in plaats van als JSON-veld.
+
+        Scheelt aan de browserkant het uitpakken en opnieuw inpakken van een
+        string van een paar honderdduizend tekens, en de browser krijgt meteen
+        de juiste bestandsnaam mee. extra zijn losse headers; het dossier stuurt
+        daarin zijn cijfers mee.
+        """
+        body = tekst.encode("utf-8")
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/markdown; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Disposition", f'attachment; filename="{naam}"')
+            self.send_header("Cache-Control", "no-store")
+            for naam_h, waarde in (extra or {}).items():
+                self.send_header(naam_h, waarde)
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def _bestand(self, naam):
         pad = (STATIC / naam).resolve()
@@ -410,6 +460,34 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(rooster.status())
             except ValueError as e:
                 self._json({"fout": str(e)}, 400)
+            except Exception as e:
+                self._json({"fout": str(e)}, 500)
+            return
+
+        if self.path == "/api/dossier":
+            # De sleutels van wat de gebruiker op dit moment gefilterd ziet, in die
+            # volgorde. Bewust de selectie uit de browser en geen filter hier: dan
+            # zou dit een tweede kopie van de filterketen worden.
+            sleutels = data.get("sleutels")
+            if not isinstance(sleutels, list) or not sleutels:
+                self._json({"fout": "sleutels ontbreekt of is leeg"}, 400)
+                return
+            try:
+                bekend = _bekende_vacatures()
+                jobs = [bekend[s] for s in sleutels if s in bekend]
+                if not jobs:
+                    self._json({"fout": "geen van deze vacatures is hier bekend"}, 404)
+                    return
+                tekst, meta = dossier.bouw(
+                    jobs, scraper.laad_config(), dossier.cv_naast_het_project()
+                )
+                # De cijfers gaan als header mee, zodat de interface kan melden wat
+                # er in het bestand staat zonder het te hoeven inlezen.
+                self._download(
+                    tekst, dossier.bestandsnaam(),
+                    {"X-Dossier": json.dumps({**meta, "gevonden": len(jobs),
+                                              "gevraagd": len(sleutels)})},
+                )
             except Exception as e:
                 self._json({"fout": str(e)}, 500)
             return
