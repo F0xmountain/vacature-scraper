@@ -118,6 +118,7 @@ def _schrijf_profiel(data):
     profiel = {
         "zoektermen": _schoon_lijst(data.get("zoektermen")),
         "titel_uitsluiten": _schoon_lijst(data.get("titel_uitsluiten")),
+        "bedrijf_uitsluiten": _schoon_lijst(data.get("bedrijf_uitsluiten")),
         "locaties_toegestaan": _schoon_lijst(data.get("locaties_toegestaan")),
         "flag_termen": _schoon_lijst(data.get("flag_termen")),
         "boards_actief": bool(data.get("boards_actief", True)),

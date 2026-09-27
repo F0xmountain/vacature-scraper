@@ -1229,6 +1229,7 @@ const LIJSTEN = [
   "boards_locaties",
   "locaties_toegestaan",
   "titel_uitsluiten",
+  "bedrijf_uitsluiten",
   "flag_termen",
 ];
 
