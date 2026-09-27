@@ -150,13 +150,19 @@ Wat de interface kan:
   bewaard, zodat een batch die je nog niet hebt bekeken niet verdwijnt
 - **Beoordelen met ja/nee**, met pijltjestoetsen en automatisch doorspringen naar
   de volgende onbeoordeelde; het oordeel overleeft runs via de dedupe-sleutel
-- **Filteren met dropdowns** op functie, bron, locatie, plaatsingsdatum,
-  vaardigheid, oordeel en vlaggen. De opties komen uit de geladen vacatures met
-  hun aantal erachter, dus er staat nooit een keuze in die niets oplevert
+- **Filteren met dropdowns** op functie, bron, werkgever, locatie,
+  plaatsingsdatum, vaardigheid, oordeel en vlaggen. De opties komen uit de
+  geladen vacatures met hun aantal erachter, dus er staat nooit een keuze in die
+  niets oplevert. De werkgeverslijst staat op aantal en daarbinnen op naam; van
+  de 830 werkgevers in het venster van 26-09-2026 hadden er 597 precies een
+  vacature, en zonder die tweede sleutel staan die in willekeurige volgorde.
+  Klikken op een staaf in de werkgeversgrafiek zet hetzelfde filter
 - **Sorteren** op meest recent geplaatst, met vacatures zonder datum onderaan
   (geen datum is onbekend, niet oud)
 - **Automatische run bedienen**: aan of uit, en de tijdstippen beheren
 - Een csv-export van je ja-lijst
+- **Dossier voor Claude**: de zichtbare vacatures plus een opdracht in een
+  markdown-bestand, om samen met je cv te laten matchen
 
 ### Functiefamilies, vaardigheden en de scherpe trechter
 

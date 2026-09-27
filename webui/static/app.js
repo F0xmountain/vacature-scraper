@@ -321,6 +321,7 @@ let oordelen = {};
 const filters = {
   familie: "",
   bron: "",
+  bedrijf: "",
   locatie: "",
   datum: "",
   vaardigheid: "",
@@ -349,6 +350,7 @@ function zichtbaar() {
     } else if (filters.familie && v.familie !== filters.familie) {
       return false;
     }
+    if (filters.bedrijf && bedrijfSleutel(v.bedrijf) !== filters.bedrijf) return false;
     if (filters.locatie && plaatsSleutel(v.locatie) !== filters.locatie) return false;
     if (filters.datum && !binnenDatum(v)) return false;
     if (filters.vaardigheid === "_kern") {
@@ -507,7 +509,12 @@ function tel(sleutelVan, labelVan) {
     r.n += 1;
     per.set(k, r);
   });
-  return Array.from(per, ([k, r]) => [k, r.label, r.n]).sort((a, b) => b[2] - a[2]);
+  // Op aantal aflopend, en bij een gelijk aantal op naam. Dat laatste is nodig
+  // sinds de werkgeverslijst erbij kwam: 597 van de 830 werkgevers hebben er
+  // precies een, en zonder tweede sleutel staan die in de volgorde waarin ze
+  // toevallig langskwamen, wat neerkomt op willekeurig.
+  return Array.from(per, ([k, r]) => [k, r.label, r.n])
+    .sort((a, b) => b[2] - a[2] || String(a[1]).localeCompare(String(b[1]), "nl"));
 }
 
 function vulKeuzelijsten() {
@@ -518,6 +525,7 @@ function vulKeuzelijsten() {
   }
   vulKeuze("filterFamilie", families, "alle functies");
   vulKeuze("filterBron", tel((v) => v.bron, (v) => bronInfo(v.bron).label), "alle bronnen");
+  vulKeuze("filterBedrijf", tel((v) => bedrijfSleutel(v.bedrijf), (v) => v.bedrijf), "alle werkgevers");
   vulKeuze("filterLocatie", tel((v) => plaatsSleutel(v.locatie), (v) => plaatsLabel(v.locatie)), "alle locaties");
 
   // Vaardigheden: een vacature kan er meerdere hebben, dus niet via tel().
@@ -542,12 +550,13 @@ function vulKeuzelijsten() {
   // De filterstaat volgt de dropdowns, voor het geval een keuze is weggevallen.
   filters.familie = $("filterFamilie").value;
   filters.bron = $("filterBron").value;
+  filters.bedrijf = $("filterBedrijf").value;
   filters.locatie = $("filterLocatie").value;
 }
 
 // De wis-knop verschijnt alleen als er echt iets te wissen valt.
 function markeerFilters() {
-  const actiefFilter = !!(filters.familie || filters.bron || filters.locatie ||
+  const actiefFilter = !!(filters.familie || filters.bron || filters.bedrijf || filters.locatie ||
     filters.vaardigheid || filters.datum || filters.vlag || filters.oordeel !== "alles" ||
     $("zoek").value.trim());
   $("btnWisFilters").hidden = !actiefFilter;
@@ -665,7 +674,10 @@ function tekenAnalyse() {
     kpiTegel(n, "in beeld") +
     kpiTegel(kern2, "met 2+ datasignalen", "Vacatures die twee of meer termen noemen die op echt data-werk wijzen") +
     kpiTegel(onbeoordeeld, "nog te beoordelen") +
-    kpiTegel(new Set(rijen.map((v) => v.bedrijf).filter(Boolean)).size, "werkgevers");
+    // Op dezelfde sleutel als het filter en de grafiek, anders telt deze tegel
+    // "ABN AMRO" en "Abn Amro" als twee werkgevers en staat er een ander getal
+    // dan eronder in de grafiek.
+    kpiTegel(new Set(rijen.map((v) => bedrijfSleutel(v.bedrijf)).filter(Boolean)).size, "werkgevers");
 
   // Vaardigheden: meerdere per vacature, dus apart tellen.
   const perV = new Map();
@@ -686,7 +698,7 @@ function tekenAnalyse() {
   $("grafieken").innerHTML =
     staafGrafiek("Functiefamilie", telOp((v) => v.familie, (v) => v.familieLabel), { filter: "familie" }) +
     staafGrafiek("Gevraagde vaardigheden", vaardig, { filter: "vaardigheid", limiet: 14 }) +
-    staafGrafiek("Werkgevers die het meest werven", telOp((v) => v.bedrijf, (v) => v.bedrijf), { limiet: 12 }) +
+    staafGrafiek("Werkgevers die het meest werven", telOp((v) => bedrijfSleutel(v.bedrijf), (v) => v.bedrijf), { filter: "bedrijf", limiet: 12 }) +
     staafGrafiek("Locatie", telOp((v) => plaatsSleutel(v.locatie) || "_onbekend", (v) => plaatsLabel(v.locatie) || "locatie onbekend"), { filter: "locatie" }) +
     staafGrafiek("Bron", telOp((v) => v.bron, (v) => bronInfo(v.bron).label), { filter: "bron" });
 
@@ -697,7 +709,7 @@ function tekenAnalyse() {
     b.onclick = () => {
       filters[sleutel] = filters[sleutel] === b.dataset.waarde ? "" : b.dataset.waarde;
       const veld = { familie: "filterFamilie", bron: "filterBron", locatie: "filterLocatie",
-                     vaardigheid: "filterVaardigheid" }[sleutel];
+                     bedrijf: "filterBedrijf", vaardigheid: "filterVaardigheid" }[sleutel];
       if (veld) $(veld).value = filters[sleutel];
       teken();
     };
@@ -959,6 +971,11 @@ function kortePlaats(l) { return String(l || "").split(",")[0].trim(); }
 // "Amsterdam, NH" en de werkenbij-bronnen een kale "amsterdam". Zonder dit staan
 // dezelfde stad twee keer in de lijst en mist het filter de helft.
 function plaatsSleutel(l) { return kortePlaats(l).toLowerCase(); }
+// Zelfde verhaal bij werkgevers: in het venster van 26-09-2026 kwamen er zes in
+// twee schrijfwijzen voor ("ABN AMRO" en "Abn Amro", "NIKE" en "Nike"). Zonder
+// deze sleutel staan die dubbel in de lijst en vangt het filter de helft.
+// Het label is de schrijfwijze van de eerste vacature die langskomt.
+function bedrijfSleutel(b) { return String(b || "").trim().toLowerCase(); }
 function plaatsLabel(l) {
   const p = kortePlaats(l);
   return p ? p.charAt(0).toUpperCase() + p.slice(1) : "";
@@ -1406,7 +1423,7 @@ function toggleProfiel() {
 /* bediening */
 $("zoek").addEventListener("input", teken);
 $("reset").onclick = () => { filters.bron = ""; $("filterBron").value = ""; teken(); };
-[["filterFamilie", "familie"], ["filterBron", "bron"], ["filterLocatie", "locatie"],
+[["filterFamilie", "familie"], ["filterBron", "bron"], ["filterBedrijf", "bedrijf"], ["filterLocatie", "locatie"],
  ["filterDatum", "datum"], ["filterVaardigheid", "vaardigheid"], ["filterOordeel", "oordeel"],
  ["filterVlag", "vlag"], ["sorteer", "sorteer"]]
   .forEach(([id, sleutel]) => {
@@ -1432,15 +1449,16 @@ $("btnScherp").onclick = () => {
 };
 $("btnWisFilters").onclick = () => {
   $("btnScherp").classList.remove("aan");
-  Object.assign(filters, { familie: "", bron: "", locatie: "", datum: "", vaardigheid: "", oordeel: "alles", vlag: "" });
+  Object.assign(filters, { familie: "", bron: "", bedrijf: "", locatie: "", datum: "", vaardigheid: "", oordeel: "alles", vlag: "" });
   $("zoek").value = "";
-  ["filterFamilie", "filterBron", "filterLocatie", "filterDatum", "filterVaardigheid", "filterVlag"]
+  ["filterFamilie", "filterBron", "filterBedrijf", "filterLocatie", "filterDatum", "filterVaardigheid", "filterVlag"]
     .forEach((id) => ($(id).value = ""));
   $("filterOordeel").value = "alles";
   teken();
 };
 $("btnLaatste").onclick = laadBewaardeRun;
 $("btnExport").onclick = exporteerJa;
+$("btnDossier").onclick = maakDossier;
 $("btnWisAlle").onclick = wisAlleOordelen;
 $("btnWisRuns").onclick = wisBewaardeRuns;
 $("btnToon").onclick = () => startRun(false);
