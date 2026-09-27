@@ -13,11 +13,17 @@
   --ja:#2F7A5A;
   --ja-zacht:#E4F1EA;
 
-  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  --cond:"IBM Plex Sans Condensed","IBM Plex Sans",-apple-system,sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  /* De IBM Plex-namen stonden hier zonder dat er ooit een font werd geladen:
+     het CSP staat alleen eigen bestanden toe en die zijn er niet, dus alle drie
+     de stacks vielen terug op het systeem en --cond was gewoon --sans. Nu staat
+     er wat er echt gebeurt. Het karakter van een eyebrow komt van kapitalen en
+     letterafstand, niet van een condensed snit die er niet is. */
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --cond:var(--sans);
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
 
   --r:6px;
+  --r-klein:4px;
 }
 
 *{box-sizing:border-box}
@@ -61,10 +67,6 @@ button{font:inherit;color:inherit}
   font-weight:700;font-size:19px;letter-spacing:.01em;
   margin:0;
 }
-.merk .sub{
-  font-family:var(--mono);font-size:11px;color:var(--muted);
-  letter-spacing:.04em;
-}
 .merk .logo{height:26px;width:auto;align-self:center}
 .knop{
   border:1px solid var(--line);
@@ -81,6 +83,16 @@ button{font:inherit;color:inherit}
 }
 .knop.primair:hover{background:#0D5E6D;border-color:#0D5E6D}
 .knop:disabled{opacity:.5;cursor:not-allowed}
+/* Stille knop: voor acties die er wel moeten zijn maar geen aandacht verdienen,
+   zoals wissen. Die stonden eerder in precies dezelfde omlijsting als exporteren
+   en laden, waardoor de werkbalk een muur van negen gelijke knoppen was en het
+   onomkeerbare er net zo uitzag als het onschuldige. */
+.knop.stil{
+  border-color:transparent;background:none;color:var(--muted);
+  font-weight:500;
+}
+.knop.stil:hover{background:var(--surface-2);border-color:var(--line-zacht);color:var(--ink)}
+.knop.stil.gevaar:hover{color:#9B2C2C;border-color:#E6C4C4;background:#FCF3F3}
 .knop:focus-visible,a:focus-visible,input:focus-visible,.rij:focus-visible{
   outline:2px solid var(--accent);outline-offset:2px;
 }
@@ -112,7 +124,7 @@ button{font:inherit;color:inherit}
 .vangst{
   background:var(--surface);
   border-bottom:1px solid var(--line);
-  padding:12px 20px 14px;
+  padding:11px 20px 12px;
 }
 .vangst-kop{
   display:flex;align-items:baseline;gap:12px;margin-bottom:8px;
@@ -128,7 +140,7 @@ button{font:inherit;color:inherit}
   font-family:var(--mono);font-size:11px;color:var(--accent);
   text-decoration:underline;text-underline-offset:3px;padding:0;
 }
-.balken{display:flex;height:26px;gap:2px;border-radius:3px;overflow:hidden}
+.balken{display:flex;height:22px;gap:2px;border-radius:var(--r-klein);overflow:hidden}
 .segment{
   border:0;padding:0;cursor:pointer;
   position:relative;min-width:4px;
@@ -138,8 +150,10 @@ button{font:inherit;color:inherit}
 .segment[aria-pressed="false"]{opacity:.28}
 .segment span{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-family:var(--mono);font-size:10px;font-weight:600;color:#fff;
+  font-family:var(--mono);font-size:10px;font-weight:600;
   letter-spacing:.02em;white-space:nowrap;overflow:hidden;
+  /* kleur wordt per segment gezet; drie van de acht vullingen zijn te licht
+     voor witte letters */
 }
 .legenda{
   display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;
@@ -148,11 +162,23 @@ button{font:inherit;color:inherit}
 .legenda i{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:6px}
 
 /* ---------- werkbalk ---------- */
+/* Twee balken met elk een eigen taak: bovenin waarmee je de lijst versmalt,
+   daaronder wat je met het resultaat doet. Eerder stond dat door elkaar in een
+   rij van zeventien even zware elementen. */
 .werkbalk{
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  padding:10px 20px;background:var(--surface-2);
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:9px 20px;background:var(--surface-2);
+  border-bottom:1px solid var(--line-zacht);
+}
+.actiebalk{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:8px 20px;background:var(--surface-2);
   border-bottom:1px solid var(--line);
 }
+/* Duwt alles erna naar rechts: daar staat wat je zelden en nooit per ongeluk
+   wil aanklikken. */
+.balk-rechts{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.balk-streep{width:1px;align-self:stretch;background:var(--line);margin:0 4px}
 .zoekveld{
   flex:1 1 240px;max-width:340px;
   border:1px solid var(--line);border-radius:var(--r);
@@ -186,9 +212,9 @@ button{font:inherit;color:inherit}
 /* ---------- rij ---------- */
 .rij{
   display:grid;
-  grid-template-columns:44px minmax(0,1fr) auto;
-  gap:14px;
-  padding:14px 20px 14px 17px;
+  grid-template-columns:36px minmax(0,1fr);
+  gap:12px;
+  padding:9px 20px 10px 17px;
   border-bottom:1px solid var(--line-zacht);
   border-left:3px solid transparent;
   cursor:pointer;
@@ -200,45 +226,64 @@ button{font:inherit;color:inherit}
 .rij[aria-selected="true"]{background:var(--accent-zacht);border-left-color:var(--accent)}
 
 .tegel{
-  width:44px;height:44px;border-radius:var(--r);
+  width:36px;height:36px;border-radius:var(--r-klein);
   border:1px solid var(--line-zacht);
   background:var(--surface-2);
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;position:relative;
 }
-.tegel img{width:100%;height:100%;object-fit:contain;padding:5px}
+.tegel img{width:100%;height:100%;object-fit:contain;padding:4px}
 .tegel .mono{
-  font-family:var(--cond);font-weight:700;font-size:15px;
-  letter-spacing:.02em;
+  font-family:var(--cond);font-weight:700;font-size:13px;
+  letter-spacing:.02em;color:var(--muted);
 }
 .tegel::after{
-  content:"";position:absolute;left:0;right:0;bottom:0;height:3px;
+  content:"";position:absolute;left:0;right:0;bottom:0;height:2px;
   background:var(--bronkleur,transparent);
 }
 
 .rij h3{
-  margin:0 0 2px;font-size:15px;font-weight:600;line-height:1.3;
+  margin:0;font-size:14.5px;font-weight:600;line-height:1.35;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  max-width:72ch;
 }
-.rij .bedrijf{font-size:13px;color:var(--ink);font-weight:500}
-.rij .plaats{font-size:13px;color:var(--muted)}
+.rij .wie{
+  font-size:12.5px;line-height:1.4;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:72ch;
+}
+.rij .bedrijf{color:var(--ink);font-weight:500}
+.rij .plaats{color:var(--muted)}
 .rij .meta{
-  margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  margin-top:5px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;
+}
+/* De datum opent de metaregel; hij stond eerder in een eigen kolom helemaal
+   rechts, met op een breed scherm een half scherm leegte ertussen. */
+.rij .datum{
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  white-space:nowrap;margin-right:1px;
 }
 .tag{
-  font-family:var(--mono);font-size:10px;letter-spacing:.04em;
+  font-family:var(--mono);font-size:10px;letter-spacing:.03em;
   text-transform:uppercase;
-  border:1px solid var(--line);border-radius:3px;
-  padding:2px 6px;color:var(--muted);background:var(--surface);
+  border:1px solid var(--line-zacht);border-radius:3px;
+  padding:1px 6px;color:var(--muted);background:var(--surface);
 }
-.tag.bron{color:#fff;border-color:transparent}
+/* De bron was een vol gekleurde pil met witte letters, en dat was het
+   luidruchtigste element op de pagina terwijl het het minst onderscheidt:
+   bijna alles komt van LinkedIn of Indeed, en de tegel draagt de bronkleur al
+   in zijn streepje. Nu een stip plus de naam. */
+.tag.bron{
+  text-transform:none;letter-spacing:0;font-size:11px;
+  display:inline-flex;align-items:center;gap:5px;
+  border-color:var(--line-zacht);background:var(--surface);color:var(--muted);
+}
+.tag.bron i{width:7px;height:7px;border-radius:2px;flex:none}
+.tag.ja-merk{
+  background:var(--ja-zacht);border-color:#BEDCCB;color:var(--ja);
+  font-weight:700;letter-spacing:.05em;
+}
 .tag.vlag{background:var(--signal-zacht);border-color:#E4CE93;color:#7A5A08;text-transform:none;letter-spacing:0}
 .tag.salaris{font-variant-numeric:tabular-nums}
-.rechts{
-  display:flex;flex-direction:column;align-items:flex-end;gap:6px;
-  font-family:var(--mono);font-size:11px;color:var(--muted);
-  white-space:nowrap;
-}
 
 /* ---------- detail ---------- */
 .detail{
@@ -251,14 +296,30 @@ button{font:inherit;color:inherit}
 .detail .onder{color:var(--muted);font-size:13px}
 .detail .acties{display:flex;gap:8px;margin:16px 0 20px}
 .detail .beschrijving{
-  font-size:13.5px;line-height:1.65;color:#2A3038;
+  font-size:13.5px;line-height:1.7;color:#2A3038;
   border-top:1px solid var(--line-zacht);padding-top:16px;
-  white-space:pre-wrap;
+  max-width:68ch;
 }
+/* De tekst komt als losse regels binnen; p en li dragen de opmaak. Eerder stond
+   alles in een pre-wrap-blok, waardoor een opsomming en een alinea er precies
+   hetzelfde uitzagen. */
+.detail .beschrijving p{margin:0 0 11px}
+.detail .beschrijving h4{
+  margin:18px 0 7px;font-size:12px;font-weight:700;color:var(--ink);
+  text-transform:uppercase;letter-spacing:.07em;
+}
+.detail .beschrijving ul{margin:0 0 12px;padding-left:18px}
+.detail .beschrijving li{margin:0 0 4px}
 .leeg{
-  padding:60px 24px;text-align:center;color:var(--muted);
+  padding:64px 28px;text-align:center;color:var(--muted);
+  max-width:34ch;margin:0 auto;
 }
-.leeg .eyebrow{display:block;margin-bottom:8px}
+.leeg .eyebrow{display:block;margin-bottom:10px}
+.leeg .teken{
+  display:block;width:38px;height:38px;margin:0 auto 14px;
+  border:1.5px solid var(--line);border-radius:var(--r);
+  background:var(--surface-2);
+}
 
 /* ---------- zoekprofiel-paneel ---------- */
 .profiel{
@@ -281,6 +342,15 @@ button{font:inherit;color:inherit}
 .profiel-binnen{
   overflow-y:auto;overflow-x:hidden;min-height:0;padding:0 20px;
   max-height:min(70vh,640px);
+  /* Schaduwrandje dat alleen verschijnt als er nog inhoud onder of boven zit.
+     Het paneel is hoger dan het scherm en werd hard afgesneden, zonder dat er
+     iets liet zien dat er nog meer stond. De twee local-lagen dekken de
+     schaduw af zodra je aan het begin of het eind bent. */
+  background:
+    linear-gradient(var(--surface) 30%, rgba(255,255,255,0)) top/100% 22px no-repeat local,
+    linear-gradient(rgba(255,255,255,0), var(--surface) 70%) bottom/100% 22px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgba(15,18,22,.09), rgba(15,18,22,0)) top/100% 9px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgba(15,18,22,.09), rgba(15,18,22,0)) bottom/100% 9px no-repeat scroll;
 }
 .profiel-rooster{
   display:grid;gap:16px 20px;padding-top:16px;
@@ -289,21 +359,26 @@ button{font:inherit;color:inherit}
 .veld{display:flex;flex-direction:column;gap:8px}
 .veld .eyebrow{margin:0}
 .veld-hint{margin:0;font-size:12px;color:var(--muted)}
-.veld-lijst{display:flex;flex-direction:column;gap:6px}
-.lijst-rij{display:flex;gap:6px;align-items:center}
+.veld-lijst{display:flex;flex-direction:column;gap:4px}
+.lijst-rij{display:flex;gap:2px;align-items:center}
 .lijst-rij input{
   flex:1;min-width:0;
-  border:1px solid var(--line);border-radius:var(--r);
+  border:1px solid var(--line);border-radius:var(--r-klein);
   background:var(--surface);color:var(--ink);
-  padding:5px 8px;font-size:13px;
+  padding:4px 8px;font-size:13px;
 }
+/* Het paneel telt zo'n zestig invoervelden. Met een omlijst kruis achter elk
+   daarvan waren er ook zestig knoppen die om aandacht vroegen terwijl je ze
+   zelden gebruikt. Nu verschijnt het kruis pas als je bij de regel bent. */
 .verwijder{
-  flex:none;width:28px;height:28px;cursor:pointer;
-  border:1px solid var(--line);border-radius:var(--r);
-  background:var(--surface);color:var(--muted);
-  font-size:15px;line-height:1;
+  flex:none;width:24px;height:24px;cursor:pointer;
+  border:1px solid transparent;border-radius:var(--r-klein);
+  background:none;color:var(--line);
+  font-size:14px;line-height:1;
+  transition:color .1s ease,background .1s ease;
 }
-.verwijder:hover{border-color:var(--accent);color:var(--accent)}
+.lijst-rij:hover .verwijder,.verwijder:focus-visible{color:var(--muted)}
+.verwijder:hover{background:#FCF3F3;color:#9B2C2C;border-color:#E6C4C4}
 .knop.add{align-self:flex-start;padding:4px 10px;font-size:12px}
 .veld-schakels{display:flex;flex-direction:column;gap:8px;font-size:13px}
 .veld-schakels label,.veld-sites label{display:flex;align-items:center;gap:8px;cursor:pointer}
@@ -323,12 +398,7 @@ button{font:inherit;color:inherit}
 .status.ok{color:#2F7A5A}
 .status.fout{color:var(--signal)}
 
-/* ---------- oordeel: filter, rijmarkering en detailknoppen ---------- */
-.oordeelfilter,.sorteerfilter{
-  display:inline-flex;align-items:stretch;
-  border:1px solid var(--line);border-radius:999px;overflow:hidden;
-  background:var(--surface);
-}
+/* ---------- oordeel: rijmarkering en detailknoppen ---------- */
 .segknop{
   border:0;border-left:1px solid var(--line);background:none;cursor:pointer;
   font-family:var(--mono);font-size:11px;color:var(--muted);
@@ -343,10 +413,6 @@ button{font:inherit;color:inherit}
 .rij.is-ja{box-shadow:inset 4px 0 0 var(--ja)}
 .rij.is-nee{opacity:.48}
 .rij.is-nee:hover{opacity:.7}
-.merk-ja{
-  font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
-  font-weight:700;color:var(--ja);
-}
 
 .oordeel-acties{display:flex;align-items:center;gap:8px;margin:0 0 18px}
 .knop.oordeel-ja.aan{background:var(--ja);border-color:var(--ja);color:#fff}
@@ -429,12 +495,20 @@ button{font:inherit;color:inherit}
   flex:1 1 auto;min-height:0;overflow-y:auto;
   background:var(--surface);padding:20px 20px 28px;
 }
-.kpi-rij{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px}
+.info{padding-top:34px}
+/* Raster en geen flex: met flex:1 1 150px kreeg elke tegel een andere breedte
+   afhankelijk van de lengte van zijn label, wat eruitzag alsof de getallen
+   ongelijk waren. */
+.kpi-rij{
+  display:grid;gap:10px;margin-bottom:22px;
+  grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+}
 .kpi{
-  flex:1 1 150px;border:1px solid var(--line);border-radius:var(--r);
+  border:1px solid var(--line-zacht);border-radius:var(--r);
   padding:12px 14px;background:var(--surface-2);
 }
-.kpi b{display:block;font-family:var(--cond);font-size:28px;font-weight:700;line-height:1.1}
+.kpi b{display:block;font-family:var(--cond);font-size:26px;font-weight:700;
+  line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .kpi span{font-family:var(--mono);font-size:11px;color:var(--muted)}
 
 .grafieken{
@@ -449,7 +523,7 @@ button{font:inherit;color:inherit}
    coderen. Waarde staat aan de punt, buiten de staaf, zodat hij nooit wordt
    afgeknipt bij een korte balk. */
 .staaf-rij{
-  display:grid;grid-template-columns:minmax(0,132px) 1fr 42px;
+  display:grid;grid-template-columns:minmax(0,150px) 1fr 42px;
   align-items:center;gap:10px;
   border:0;background:none;padding:2px 0;cursor:pointer;text-align:left;
   border-radius:3px;
@@ -477,8 +551,11 @@ button{font:inherit;color:inherit}
 .knop.scherp.aan{background:var(--accent);border-color:var(--accent);color:#fff}
 
 /* ---------- infopaneel ---------- */
-.info-binnen{max-width:72ch}
-.info h2{font-family:var(--cond);font-size:21px;font-weight:700;margin:0 0 8px}
+/* Gecentreerd in plaats van tegen de linkerrand: op een breed scherm stond
+   deze kolom lopende tekst in zijn eentje links, met het halve scherm leeg
+   ernaast. */
+.info-binnen{max-width:76ch;margin:0 auto}
+.info h2{font-family:var(--cond);font-size:22px;font-weight:700;margin:0 0 8px;letter-spacing:-.01em}
 .info h3{font-family:var(--cond);font-size:15px;font-weight:700;margin:0 0 8px}
 .info-lead{margin:0 0 26px;color:var(--muted)}
 .info-blok{margin-bottom:28px}

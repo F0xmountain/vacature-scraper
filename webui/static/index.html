@@ -108,7 +108,7 @@
     </div>
   </section>
 
-  <section class="vangst">
+  <section class="vangst" id="vangst">
     <div class="vangst-kop">
       <span class="eyebrow">Vangst per bron</span>
       <span class="vangst-totaal"><b id="totaal">0</b> vacatures</span>
@@ -118,10 +118,11 @@
     <div class="legenda" id="legenda"></div>
   </section>
 
-  <div class="werkbalk">
+  <div class="werkbalk" id="werkbalk">
     <input class="zoekveld" id="zoek" type="search" placeholder="Zoek op functie, bedrijf of plaats">
     <select class="keuze" id="filterFamilie" aria-label="Filter op functie"></select>
     <select class="keuze" id="filterBron" aria-label="Filter op bron"></select>
+    <select class="keuze" id="filterBedrijf" aria-label="Filter op werkgever"></select>
     <select class="keuze" id="filterLocatie" aria-label="Filter op locatie"></select>
     <select class="keuze" id="filterDatum" aria-label="Filter op plaatsingsdatum"></select>
     <select class="keuze" id="filterVaardigheid" aria-label="Filter op vaardigheid"></select>
@@ -143,11 +144,18 @@
     </select>
     <button class="knop scherp" type="button" id="btnScherp" title="Kernrollen plus twee of meer datasignalen">Scherpe trechter</button>
     <button class="knop wis" type="button" id="btnWisFilters" hidden>filters wissen</button>
-    <button class="knop" id="btnLaatste" title="Toon de laatst weggeschreven automatische run">Laatste run</button>
-    <button class="knop" id="btnExport">Exporteer ja-lijst</button>
-    <button class="knop" id="btnWisAlle">Wis alle oordelen</button>
-    <button class="knop" id="btnWisRuns" title="Verwijdert de bewaarde runs met hun functieteksten">Wis vacatures</button>
     <span class="telling" id="telling"></span>
+  </div>
+
+  <div class="actiebalk" id="actiebalk" role="toolbar" aria-label="Acties">
+    <button class="knop" id="btnLaatste" title="Toon de laatst weggeschreven automatische run">Laatste run</button>
+    <span class="balk-streep" aria-hidden="true"></span>
+    <button class="knop" id="btnExport">Exporteer ja-lijst</button>
+    <button class="knop" id="btnDossier" title="Maakt een markdown-bestand van de zichtbare vacatures, met een opdracht erboven, om samen met je cv aan Claude te geven">Dossier voor Claude</button>
+    <div class="balk-rechts">
+      <button class="knop stil gevaar" id="btnWisAlle">Wis alle oordelen</button>
+      <button class="knop stil gevaar" id="btnWisRuns" title="Verwijdert de bewaarde runs met hun functieteksten">Wis vacatures</button>
+    </div>
   </div>
 
   <main class="split" id="weergaveLijst">

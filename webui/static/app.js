@@ -260,25 +260,56 @@ function monogramAlsPlaceholder(tegel, bedrijf, img) {
    BRONNEN EN WEERGAVE
    ============================================================ */
 
+// Acht bronkleuren, en acht is het maximum. Het oude palet was op het oog
+// gekozen en faalde gemeten: LinkedIn en Indeed, de twee bronnen die altijd
+// naast elkaar in de strip staan, lagen op een verschil van 6,6 voor normaal
+// zicht terwijl 15 de vloer is, en vijf van de negen kleuren zaten onder de
+// chromavloer (ze lezen als grijs). Deze acht halen elke check: slechtste
+// buurpaar 9,1 bij kleurenblindheid en 19,6 voor normaal zicht.
+//
+// Een negende en tiende kleur erbij verzinnen faalt opnieuw (gemeten: chroma
+// 0,087 en een buurpaar van 6,1), dus Lever en Workday krijgen bewust de
+// neutrale en worden door hun naam in de legenda gedragen. Komen die bronnen
+// ooit echt op gang, meet dan opnieuw in plaats van een kleur te verzinnen.
+const BRON_NEUTRAAL = "#5F6975";
 const BRON = {
-  linkedin: { label: "LinkedIn", kleur: "#2E5E8C" },
-  indeed: { label: "Indeed", kleur: "#4B54A8" },
-  greenhouse: { label: "Greenhouse", kleur: "#2F7A5A" },
-  recruitee: { label: "Recruitee", kleur: "#8C5A2E" },
-  lever: { label: "Lever", kleur: "#3E7C8C" },
-  workday: { label: "Workday", kleur: "#6B7A2E" },
-  magnetme: { label: "Magnet.me", kleur: "#7A2E6B" },
-  "banken.nl": { label: "Banken.nl", kleur: "#8C3A4A" },
-  werkenbijdnb: { label: "DNB", kleur: "#0B4F5C" },
+  linkedin: { label: "LinkedIn", kleur: "#2a78d6" },
+  indeed: { label: "Indeed", kleur: "#eb6834" },
+  "consultancy.nl": { label: "Consultancy.nl", kleur: "#1baf7a" },
+  magnetme: { label: "Magnet.me", kleur: "#eda100" },
+  "banken.nl": { label: "Banken.nl", kleur: "#e87ba4" },
+  greenhouse: { label: "Greenhouse", kleur: "#008300" },
+  werkenbijdnb: { label: "DNB", kleur: "#4a3aa7" },
+  recruitee: { label: "Recruitee", kleur: "#e34948" },
+  lever: { label: "Lever", kleur: BRON_NEUTRAAL },
+  workday: { label: "Workday", kleur: BRON_NEUTRAAL },
 };
 
-// Samengestelde bronwaarden ("linkedin, magnetme" na dedupe) tonen we onder het
-// eerste deel voor de komma; de volledige waarde komt als vol in de tooltip.
+// Samengestelde bronwaarden ("linkedin, magnetme" na dedupe) krijgen de kleur
+// van het eerste deel, maar wel hun eigen naam. Stond er eerder alleen "Indeed",
+// dan zag je "Indeed 113" en "Indeed 21" onder elkaar in de legenda staan met
+// dezelfde kleur, wat eruitzag als een fout.
 function bronInfo(b) {
   const vol = b || "";
-  const eerste = vol.split(",")[0].trim();
-  const basis = BRON[eerste] || { label: eerste || "onbekend", kleur: "#5F6975" };
-  return { label: basis.label, kleur: basis.kleur, vol };
+  const delen = vol.split(",").map((d) => d.trim()).filter(Boolean);
+  const basis = BRON[delen[0]] || { label: delen[0] || "onbekend", kleur: BRON_NEUTRAAL };
+  const label = delen.length > 1
+    ? delen.map((d) => (BRON[d] || { label: d }).label).join(" + ")
+    : basis.label;
+  return { label, kleur: basis.kleur, vol };
+}
+
+// Witte of donkere letters op een gekleurd vlak, afhankelijk van de vulling.
+// Drie van de acht kleuren zijn te licht voor wit; zonder dit verdwijnt het
+// label in de strip precies op de bronnen met de lichtste kleur.
+function inktOp(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return lum > 0.45 ? "#1B1F24" : "#FFFFFF";
 }
 
 let alles = [];
@@ -391,6 +422,7 @@ function tekenVangst() {
     b.className = "segment";
     b.style.flex = String(n);
     b.style.background = info.kleur;
+    b.style.color = inktOp(info.kleur);
     b.setAttribute("aria-pressed", String(!filters.bron || filters.bron === bron));
     b.title = `${info.vol}: ${n}`;
     const s = document.createElement("span");
@@ -532,25 +564,25 @@ function maakRij(v, i) {
 
   rij.appendChild(maakTegel(v.bedrijf, info.kleur));
 
+  // Datum en bron staan in de metaregel, niet in een eigen kolom rechts. Die
+  // kolom duwde de inhoud uit elkaar: op een breed scherm zat er een half
+  // scherm leegte tussen de plaatsnaam en de datum. Alles links uitgelijnd
+  // leest als een kolom en scheelt ruim twintig procent rijhoogte.
+  const o = oordelen[v.sleutel] || "";
   const midden = document.createElement("div");
   midden.style.minWidth = "0";
   midden.innerHTML = `
     <h3>${esc(v.functie)}</h3>
-    <div><span class="bedrijf">${esc(v.bedrijf)}</span> <span class="plaats">${esc(kortePlaats(v.locatie))}</span></div>
+    <div class="wie"><span class="bedrijf">${esc(v.bedrijf)}</span> <span class="plaats">${esc(kortePlaats(v.locatie))}</span></div>
     <div class="meta">
-      <span class="tag bron" style="background:${info.kleur}">${esc(info.label)}</span>
+      <span class="datum">${v.geplaatst ? esc(datum(v.geplaatst)) : "geen datum"}</span>
+      <span class="tag bron" title="${esc(info.vol)}"><i style="background:${info.kleur}"></i>${esc(info.label)}</span>
       ${v.salaris ? `<span class="tag salaris">${esc(v.salaris)}</span>` : ""}
       ${(v.kern || 0) >= 2 ? `<span class="tag kern" title="${esc((v.vaardigheden || []).join(", "))}">${v.kern} datasignalen</span>` : ""}
       ${(v.vlaggen || []).map((f) => `<span class="tag vlag">${esc(f)}</span>`).join("")}
+      ${o === "ja" ? `<span class="tag ja-merk">shortlist</span>` : ""}
     </div>`;
   rij.appendChild(midden);
-
-  const rechts = document.createElement("div");
-  rechts.className = "rechts";
-  const o = oordelen[v.sleutel] || "";
-  rechts.innerHTML = `<span>${v.geplaatst ? esc(datum(v.geplaatst)) : "geen datum"}</span>` +
-    (o === "ja" ? `<span class="merk-ja">shortlist</span>` : "");
-  rij.appendChild(rechts);
 
   // ja krijgt een duidelijke markering (groene rand plus label), nee wordt gedimd.
   if (o === "ja") rij.classList.add("is-ja");
@@ -720,6 +752,14 @@ function kiesWeergave(w) {
   $("weergaveLijst").hidden = w !== "lijst";
   $("weergaveAnalyse").hidden = w !== "analyse";
   $("weergaveInfo").hidden = w !== "info";
+  // Op de infopagina zeggen de vangststrip en de filters niets: er valt daar
+  // niets te filteren. Ze stonden er alleen maar ruimte in te nemen boven een
+  // pagina met lopende tekst. In de analyseweergave blijven ze wel staan, want
+  // de grafieken rekenen op wat je gefilterd hebt.
+  const stil = w === "info";
+  $("vangst").hidden = stil;
+  $("werkbalk").hidden = stil;
+  $("actiebalk").hidden = stil;
   if (w === "info") tekenInfo();
   document.querySelectorAll(".weergavekeuze .segknop").forEach((b) => {
     const aan = b.dataset.w === w;
@@ -732,8 +772,10 @@ function kiesWeergave(w) {
 function tekenDetail() {
   const d = $("detail");
   if (!actief) {
-    d.innerHTML = `<div class="leeg"><span class="eyebrow">Detail</span>
-      Kies een vacature om de omschrijving hier te lezen.</div>`;
+    d.innerHTML = `<div class="leeg"><span class="teken" aria-hidden="true"></span>
+      <span class="eyebrow">Detail</span>
+      Kies links een vacature. De volledige functietekst, de gevraagde
+      vaardigheden en de ja/nee-knoppen staan dan hier.</div>`;
     return;
   }
   const v = actief, info = bronInfo(v.bron);
@@ -751,7 +793,7 @@ function tekenDetail() {
   const meta = document.createElement("div");
   meta.className = "meta";
   meta.innerHTML = `
-    <span class="tag bron" style="background:${info.kleur}">${esc(info.label)}</span>
+    <span class="tag bron" title="${esc(info.vol)}"><i style="background:${info.kleur}"></i>${esc(info.label)}</span>
     ${v.geplaatst ? `<span class="tag">${esc(datum(v.geplaatst))}</span>` : `<span class="tag">bron geeft geen datum</span>`}
     ${v.salaris ? `<span class="tag salaris">${esc(v.salaris)}</span>` : ""}
     ${(v.vlaggen || []).map((f) => `<span class="tag vlag">${esc(f)}</span>`).join("")}`;
@@ -800,9 +842,102 @@ function tekenDetail() {
 
   const b = document.createElement("div");
   b.className = "beschrijving";
-  b.textContent = v.beschrijving ||
-    `${info.label || "De bron"} levert geen omschrijving in de lijstweergave. Open de vacature voor de volledige tekst.`;
+  if ((v.beschrijving || "").trim()) {
+    maakOpmaak(b, v.beschrijving);
+  } else {
+    const p = document.createElement("p");
+    p.textContent = `${info.label || "De bron"} levert geen omschrijving in de lijstweergave. ` +
+      "Open de vacature voor de volledige tekst.";
+    b.appendChild(p);
+  }
   d.appendChild(b);
+}
+
+// Opmaakresten die de bronnen meesturen. Workday levert markdown in zijn JSON
+// ("### **Basic Information**", "25\\-Sep\\-2026"), LinkedIn laat sterretjes
+// staan. Dit haalt alleen die tekens weg; er wordt niets aan de woorden veranderd.
+const _MD_KOP = /^#{1,6}\s+/;
+const _MD_VET = /\*\*(.*?)\*\*/g;
+// Elk backslash voor een leesteken; de bronnen ontsnappen van alles ("\&",
+// "25\-Sep", "\(m/v\)") en een vaste lijst tekens miste er telkens een.
+const _MD_ONTSNAPT = /\\([^\w\s])/g;
+const _OPSOMMING = /^[-*\u2022\u00b7\u2023\u25aa]\s+/;
+
+function _schoonRegel(regel) {
+  return regel.replace(_MD_ONTSNAPT, "$1").replace(_MD_VET, "$1").trim();
+}
+
+// Een blok van drie of meer regels zonder afsluitend leesteken is een opsomming
+// die onderweg zijn opsommingstekens is kwijtgeraakt; zo leveren LinkedIn en de
+// meeste ats-feeds hun eisenlijst aan. Onder de drie is het gokwerk en blijven
+// het gewoon alinea's.
+function _isPunt(regel) {
+  return regel.length <= 90 && !/[.:;?!]$/.test(regel);
+}
+
+// Maar niet elk blok korte regels is een opsomming. Workday stuurt zijn kop van
+// de vacature als sleutel en waarde op losse regels ("Country", "Netherlands",
+// "State", "NA"), en daar twintig bolletjes van maken leest slechter dan het
+// origineel. Een echte eisenlijst heeft inhoudelijke regels, dus de helft moet
+// minstens 25 tekens lang zijn.
+function _isLijstblok(regels) {
+  const lang = regels.filter((r) => r.length >= 25).length;
+  return regels.length >= 3 && lang * 2 >= regels.length;
+}
+
+function maakOpmaak(doel, tekst) {
+  const regels = String(tekst).split("\n").map(_schoonRegel);
+  let lijst = null;
+  const sluit = () => { lijst = null; };
+
+  for (let i = 0; i < regels.length; i++) {
+    const regel = regels[i];
+    if (!regel) { sluit(); continue; }
+
+    if (_MD_KOP.test(regels[i]) || (regel.length <= 60 && regel.endsWith(":"))) {
+      sluit();
+      const h = document.createElement("h4");
+      h.textContent = regel.replace(_MD_KOP, "").replace(/:$/, "");
+      doel.appendChild(h);
+      continue;
+    }
+
+    const metTeken = _OPSOMMING.test(regel);
+    // Vooruitkijken: hoort deze regel bij een blok dat als opsomming leest?
+    let blok = [];
+    if (!metTeken && _isPunt(regel)) {
+      for (let j = i; regels[j] && _isPunt(regels[j]); j++) blok.push(regels[j]);
+    }
+    if (metTeken || _isLijstblok(blok) || (lijst && _isPunt(regel))) {
+      if (!lijst) {
+        lijst = document.createElement("ul");
+        doel.appendChild(lijst);
+      }
+      const li = document.createElement("li");
+      li.textContent = regel.replace(_OPSOMMING, "");
+      lijst.appendChild(li);
+      continue;
+    }
+
+    sluit();
+    // Een blok korte regels dat geen opsomming is, is bijna altijd een sleutel
+    // en waarde onder elkaar (Workday doet dat met zijn kop). Als losse alinea's
+    // met witruimte ertussen beslaat dat het halve paneel; als een blok met
+    // regelovergangen blijft het leesbaar en compact.
+    if (blok.length >= 3) {
+      const p = document.createElement("p");
+      blok.forEach((r, k) => {
+        if (k) p.appendChild(document.createElement("br"));
+        p.appendChild(document.createTextNode(r));
+      });
+      doel.appendChild(p);
+      i += blok.length - 1;
+      continue;
+    }
+    const p = document.createElement("p");
+    p.textContent = regel;
+    doel.appendChild(p);
+  }
 }
 
 function vul(data) {

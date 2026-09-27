@@ -87,6 +87,15 @@ komen vaker terloops voor in relevante vacatures dan als kenmerk in ruis. "zorg"
 stond in 162 ruisvacatures maar ook in 489 relevante, "retail" in 26 tegen 62.
 Uitsluiten gaat op titel en werkgever, niet op tekst.
 
+**Kies grafiek- en bronkleuren niet op het oog.** Het eerste bronpalet was zo
+gekozen en faalde gemeten: LinkedIn en Indeed, de twee bronnen die altijd naast
+elkaar in de vangststrip staan, lagen op een verschil van 6,6 terwijl 15 de
+ondergrens is voor normaal zicht, en vijf van de negen kleuren zaten onder de
+chromavloer en lazen dus als grijs. Het palet in `webui/static/app.js` is nu
+gevalideerd (slechtste buurpaar 9,1 bij kleurenblindheid, 19,6 normaal). Acht is
+het maximum: een negende en tiende kleur erbij verzinnen faalt opnieuw, dus Lever
+en Workday staan bewust neutraal. Meet voor je hier iets aan verandert.
+
 **Een dossier van het hele venster past niet in een gesprek.** Het venster van
 drie dagen telt miljoenen tekens; op 27-09-2026 kwam het hele venster uit op een
 dossier van 320.000 tokens, en dat past nergens in. `dossier.py` verdeelt
